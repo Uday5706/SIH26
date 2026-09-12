@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SIH26171 Privacy Test Environment</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 16px;
+      width: 460px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    h2 {
+      margin-top: 0;
+      color: #38bdf8;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #fff;
+      box-sizing: border-box;
+    }
+    .profile-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f43f5e, #fb923c);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Synthetic Privacy Test Bench</h2>
+    <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:20px;">
+      Test 3-Tier Redaction Engine (Tier 1 DOM + Tier 2 Text/Luhn + Tier 3 CV).
+    </p>
+
+    <div class="profile-card">
+      <div class="avatar">👤</div>
+      <div>
+        <strong style="color:#fff;">Target User Profile</strong><br>
+        <span style="font-size:0.8rem; color:#94a3b8;">Email: alex.privacy@example.com</span>
+      </div>
+    </div>
+
+    <form id="privacyForm" onsubmit="event.preventDefault(); alert('Form submitted!');">
+      <div class="form-group">
+        <label for="fullName">Full Name</label>
+        <input type="text" id="fullName" name="fullName" placeholder="Full Name" value="Alex Rivera">
+      </div>
+
+      <div class="form-group">
+        <label for="emailInput">Email Address (Tier 2 Text Redaction)</label>
+        <input type="email" id="emailInput" name="email" value="alex.rivera@example.com">
+      </div>
+
+      <div class="form-group">
+        <label for="passInput">Password (Tier 1 DOM Redaction)</label>
+        <input type="password" id="passInput" name="password" value="SuperSecretPassword123!">
+      </div>
+
+      <div class="form-group">
+        <label for="cardNumberInput">Credit Card (Tier 2 Luhn Validated)</label>
+        <input type="text" id="cardNumberInput" name="card" autocomplete="cc-number" value="4532 0123 4567 8910">
+      </div>
+
+      <div class="form-group">
+        <label>Aadhaar Number (Tier 2 Regex)</label>
+        <p style="font-size:0.9rem; background:#0f172a; padding:8px; border-radius:6px; margin:0;">
+          Aadhaar: 3672 8901 4523
+        </p>
+      </div>
+
+      <button type="submit" id="btnSubmit" class="btn-submit">Submit Registration</button>
+    </form>
+  </div>
+</body>
+</html>

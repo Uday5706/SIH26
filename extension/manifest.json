@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Privacy-Preserving Vision Agent (SIH26171)",
+  "version": "1.0.0",
+  "description": "Hybrid local client redaction engine & macro vision agent for privacy-preserving web automation.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "offscreen",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/service_worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "SIH26171 Vision Agent Dashboard"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "content/pii_dom_scanner.js",
+        "content/pii_text_scanner.js",
+        "content/macro_executor.js",
+        "content/content_script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "offscreen/offscreen.html",
+        "shared/constants.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
