@@ -69,28 +69,58 @@ window.CVRedactor = (function () {
 
   function clusterPoints(points, maxW, maxH) {
     if (points.length === 0) return [];
-    let minX = maxW, minY = maxH, maxX = 0, maxY = 0;
+    
+    const clusters = [];
+    const MAX_CLUSTER_SIZE = 120;
+    const MAX_DISTANCE = 40;
 
     points.forEach((p) => {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
+      let addedToCluster = false;
+      for (const cluster of clusters) {
+        if (
+          p.x >= cluster.minX - MAX_DISTANCE && p.x <= cluster.maxX + MAX_DISTANCE &&
+          p.y >= cluster.minY - MAX_DISTANCE && p.y <= cluster.maxY + MAX_DISTANCE
+        ) {
+          const newMinX = Math.min(cluster.minX, p.x);
+          const newMaxX = Math.max(cluster.maxX, p.x);
+          const newMinY = Math.min(cluster.minY, p.y);
+          const newMaxY = Math.max(cluster.maxY, p.y);
+
+          if ((newMaxX - newMinX) <= MAX_CLUSTER_SIZE && (newMaxY - newMinY) <= MAX_CLUSTER_SIZE) {
+            cluster.minX = newMinX;
+            cluster.maxX = newMaxX;
+            cluster.minY = newMinY;
+            cluster.maxY = newMaxY;
+            cluster.pointsCount++;
+            addedToCluster = true;
+            break;
+          }
+        }
+      }
+
+      if (!addedToCluster) {
+        clusters.push({
+          minX: p.x, maxX: p.x, minY: p.y, maxY: p.y, pointsCount: 1
+        });
+      }
     });
 
-    const width = maxX - minX;
-    const height = maxY - minY;
+    const boxes = [];
+    clusters.forEach(c => {
+      const width = c.maxX - c.minX;
+      const height = c.maxY - c.minY;
+      
+      if (width >= 20 && height >= 20 && c.pointsCount > 10) {
+        boxes.push({
+          x: c.minX,
+          y: c.minY,
+          width: width,
+          height: height
+        });
+      }
+    });
 
-    // Filter out huge background blocks (e.g. background walls)
-    if (width > maxW * 0.8 || height > maxH * 0.8) return [];
-    if (width < 30 || height < 30) return [];
-
-    return [{
-      x: minX,
-      y: minY,
-      width: width,
-      height: height
-    }];
+    return boxes;
   }
 
   return {

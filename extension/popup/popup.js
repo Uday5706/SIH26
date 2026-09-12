@@ -47,12 +47,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  const btnAuditPayload = document.getElementById('btnAuditPayload');
+
   // Handle View Redacted Proof Snapshot Image
   btnProof.addEventListener('click', () => {
     const serverUrl = serverUrlInput.value.trim() || 'http://127.0.0.1:8000';
     const proofUrl = `${serverUrl}/public/snapshots/latest_redacted_frame.png`;
     chrome.tabs.create({ url: proofUrl });
   });
+
+  // Handle View Transmitted Audit JSON Payload
+  if (btnAuditPayload) {
+    btnAuditPayload.addEventListener('click', () => {
+      const serverUrl = serverUrlInput.value.trim() || 'http://127.0.0.1:8000';
+      const auditUrl = `${serverUrl}/public/payload_audit.json`;
+      chrome.tabs.create({ url: auditUrl });
+    });
+  }
 
   // Listen for live background updates
   chrome.runtime.onMessage.addListener((message) => {

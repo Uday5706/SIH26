@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Action Demo</title>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      padding: 40px;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 200vh; /* Allow for scrolling */
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    h1 { color: #38bdf8; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-size: 14px; color: #cbd5e1; }
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: white;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 20px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover { background: #1d4ed8; }
+    .spacer { height: 800px; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>📚 Library Search (Mock Agent Target)</h1>
+    <p>The agent will attempt to scroll down, type "compiler design" into the search box, and click search/press enter.</p>
+    
+    <div class="spacer">
+      <p style="text-align:center; color: #475569; padding-top: 400px;">(Scroll down to see the search form)</p>
+    </div>
+
+    <!-- The actual search form the Mock Provider is targeting -->
+    <div class="form-group">
+      <label for="searchInput">Library Search</label>
+      <input type="text" id="searchInput" placeholder="Search for books, articles..." role="textbox" name="q" data-semantic="SEARCH">
+    </div>
+
+    <button type="button" id="searchBtn" role="button" onclick="alert('Search submitted: ' + document.getElementById('searchInput').value)">Search</button>
+
+    <hr style="border-color:#334155; margin: 40px 0;">
+
+    <h2>🔒 Privacy Regression Test</h2>
+    <p style="font-size: 12px; color: #94a3b8;">
+      The Agent Executor interacts with the REAL DOM, but the Privacy Scanner should still detect these and the Privacy Gate should block them from reaching the Mock Provider.
+    </p>
+
+    <div class="form-group">
+      <label for="regEmail">Email Address</label>
+      <input type="email" id="regEmail" value="synthetic@example.com">
+    </div>
+
+    <div class="form-group">
+      <label for="regPass">Password</label>
+      <input type="password" id="regPass" value="SyntheticPassword123">
+    </div>
+    
+    <div class="form-group">
+      <label for="regPhone">Phone Number</label>
+      <input type="tel" id="regPhone" value="9876543210">
+    </div>
+
+  </div>
+
+</body>
+</html>

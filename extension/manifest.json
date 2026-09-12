@@ -27,7 +27,12 @@
       "js": [
         "content/pii_dom_scanner.js",
         "content/pii_text_scanner.js",
-        "content/macro_executor.js",
+        "content/actions/executor.js",
+        "content/actions/click.js",
+        "content/actions/type.js",
+        "content/actions/scroll.js",
+        "content/actions/keypress.js",
+        "content/actions/wait.js",
         "content/content_script.js"
       ],
       "run_at": "document_idle"
