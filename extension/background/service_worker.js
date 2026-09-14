@@ -116,11 +116,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (action === 'START_AGENT') {
     agentState.isRunning = true;
-    const goal = payload.goal || 'Complete task';
+    const goal = (payload && payload.goal) || 'Complete task';
+    const serverUrl = (payload && payload.serverUrl) || 'http://127.0.0.1:8000';
     
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs.length > 0) {
-        agentController.start(goal, tabs[0].id);
+        agentController.start(goal, tabs[0].id, serverUrl);
       } else {
         updateStatus('Error: No active tab found.');
       }

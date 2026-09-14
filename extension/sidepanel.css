@@ -412,6 +412,7 @@ button, textarea { font: inherit; }
 }
 
 .tag.pii { color: var(--amber); border-color: rgba(242,166,90,.3); }
+.tag.high { color: var(--red); border-color: rgba(255,123,114,.3); background: rgba(255,123,114,.08); }
 .tag.safe { color: var(--mint); border-color: rgba(110,231,183,.3); }
 
 /* ---------- Composer ---------- */

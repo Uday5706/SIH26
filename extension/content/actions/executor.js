@@ -12,13 +12,27 @@ window.ActionExecutor = (function() {
     handlers[actionName] = handlerFn;
   }
 
-  // Robust target resolution based on structured JSON targeting
+  // Robust target resolution based on structured JSON targeting & CSS selectors
   function resolveTarget(targetDef) {
     if (!targetDef) return null;
 
-    // We build a list of all potential elements in the body
+    // 1. Direct CSS Selector string or targetDef.selector / targetDef.target_selector
+    const selector = typeof targetDef === 'string' 
+      ? targetDef 
+      : (targetDef.selector || targetDef.target_selector || targetDef.css_selector);
+
+    if (selector && typeof selector === 'string') {
+      try {
+        const el = document.querySelector(selector);
+        if (el && isVisible(el)) return el;
+      } catch (e) {
+        // Fall back to fuzzy search
+      }
+    }
+
+    // 2. We build a list of all potential elements in the body
     // and score them based on matching attributes.
-    const candidates = Array.from(document.querySelectorAll('button, a, input, textarea, select, [role="button"]'));
+    const candidates = Array.from(document.querySelectorAll('button, a, input, textarea, select, [role="button"], [contenteditable="true"]'));
     
     let bestMatch = null;
     let highestScore = 0;
@@ -35,23 +49,26 @@ window.ActionExecutor = (function() {
       }
 
       // Match text (button text, link text)
-      if (targetDef.text) {
-        const textContent = (el.textContent || el.value || '').trim().toLowerCase();
-        if (textContent === targetDef.text.toLowerCase()) {
+      if (targetDef.text || targetDef.text_fallback) {
+        const queryText = (targetDef.text || targetDef.text_fallback || '').toLowerCase();
+        const textContent = (el.textContent || el.value || el.getAttribute('placeholder') || '').trim().toLowerCase();
+        if (textContent === queryText) {
           score += 5; // Exact match
-        } else if (textContent.includes(targetDef.text.toLowerCase())) {
+        } else if (textContent.includes(queryText)) {
           score += 3; // Partial match
         }
       }
 
       // Match semantic type (from our DOM scanner) or specific attributes
-      if (targetDef.semantic_type) {
+      if (targetDef.semantic_type || targetDef.name || targetDef.id) {
         const type = (el.getAttribute('type') || '').toLowerCase();
         const name = (el.getAttribute('name') || '').toLowerCase();
+        const id = (el.id || '').toLowerCase();
         const placeholder = (el.getAttribute('placeholder') || '').toLowerCase();
-        const combined = `${type} ${name} ${placeholder}`;
+        const combined = `${type} ${name} ${id} ${placeholder}`;
         
-        if (combined.includes(targetDef.semantic_type.toLowerCase())) {
+        const term = (targetDef.semantic_type || targetDef.name || targetDef.id || '').toLowerCase();
+        if (combined.includes(term)) {
           score += 4;
         }
       }
@@ -62,7 +79,6 @@ window.ActionExecutor = (function() {
       }
     }
 
-    // Fail safely if ambiguity is too high (we need a decent score to proceed)
     if (highestScore >= 2) {
       return bestMatch;
     }
