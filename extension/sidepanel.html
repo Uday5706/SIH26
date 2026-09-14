@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentra</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <div class="app">
+
+    <header class="topbar">
+      <button class="icon-btn" id="newTaskBtn" title="New task" aria-label="New task">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <button class="session-picker" id="sessionPicker" type="button">
+        <span class="dot dot-live"></span>
+        <span id="sessionLabel">Privacy Browser Agent</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+          <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div class="topbar-right">
+        <button class="icon-btn" id="closeBtn" title="Close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!--
+      IMPORTANT:
+      This card intentionally reveals ONE stage at a time.
+      Task -> Status -> Step -> Elapsed -> Action -> Confirmation.
+    -->
+    <section class="agent-flow" id="agentFlow" aria-live="polite">
+
+      <div class="flow-header">
+        <div class="agent-brand">
+          <span class="agent-icon">🤖</span>
+          <div>
+            <div class="agent-title">Privacy Browser Agent</div>
+            <div class="agent-subtitle" id="flowSubtitle">Ready for a task</div>
+          </div>
+        </div>
+        <span class="status-pill ready" id="statusPill">READY</span>
+      </div>
+
+      <!-- Stage 1: Task -->
+      <div class="flow-stage" id="stageTask">
+        <span class="stage-marker">1</span>
+        <div class="stage-content">
+          <div class="stage-label">Task</div>
+          <div class="stage-value" id="taskValue">Waiting for task…</div>
+        </div>
+      </div>
+
+      <!-- Stage 2: Agent status -->
+      <div class="flow-stage hidden" id="stageStatus">
+        <span class="stage-marker">2</span>
+        <div class="stage-content">
+          <div class="stage-label">Agent status</div>
+          <div class="stage-value" id="statusValue">Starting…</div>
+        </div>
+      </div>
+
+      <!-- Stage 3: Current step -->
+      <div class="flow-stage hidden" id="stageStep">
+        <span class="stage-marker">3</span>
+        <div class="stage-content">
+          <div class="stage-label">Current step</div>
+          <div class="stage-value" id="stepValue">—</div>
+        </div>
+      </div>
+
+      <!-- Stage 4: Elapsed time -->
+      <div class="flow-stage hidden" id="stageElapsed">
+        <span class="stage-marker">4</span>
+        <div class="stage-content">
+          <div class="stage-label">Elapsed time</div>
+          <div class="stage-value mono" id="elapsedValue">00:00.00</div>
+        </div>
+      </div>
+
+      <!-- Stage 5: Action -->
+      <div class="flow-stage hidden" id="stageAction">
+        <span class="stage-marker">5</span>
+        <div class="stage-content">
+          <div class="stage-label">Action being performed</div>
+          <div class="stage-value action-value" id="actionValue">—</div>
+        </div>
+      </div>
+
+      <!-- Stage 6: Confirmation -->
+      <div class="flow-stage confirmation-stage hidden" id="stageConfirmation">
+        <span class="stage-marker">6</span>
+        <div class="stage-content">
+          <div class="stage-label">Confirmation</div>
+          <div class="confirmation-message" id="confirmationText">
+            Confirmation required.
+          </div>
+          <div class="confirmation-actions">
+            <button id="confirmBtn" class="confirm-btn">Confirm</button>
+            <button id="denyBtn" class="deny-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-progress">
+        <div class="progress-track">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+      </div>
+
+      <button id="stopBtn" class="stop-btn" hidden>
+        <span class="stop-dot"></span>
+        STOP
+      </button>
+    </section>
+
+    <main class="thread" id="thread"></main>
+
+    <div class="composer">
+      <div class="composer-row">
+        <button class="icon-btn ghost" id="captureBtn" title="Scan current page" aria-label="Scan current page">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+
+        <textarea id="composerInput"
+          placeholder="Tell Sentra what to do on this page…"
+          rows="1"></textarea>
+
+        <button class="icon-btn send" id="sendBtn" title="Run task" aria-label="Run task">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="composer-foot">
+        <span id="modelTag">Local privacy scan • Server reasoning</span>
+        <span class="privacy-badge">🔒 Raw data stays local</span>
+      </div>
+    </div>
+
+  </div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
