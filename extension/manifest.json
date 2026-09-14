@@ -1,10 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "Sentra — Privacy-Preserving Vision Agent",
-  "version": "0.1.0",
-  "description": "A local vision agent that reads your screen, redacts sensitive data client-side, and only sends sanitized context to the server for reasoning.",
-  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
-  "host_permissions": ["<all_urls>"],
+  "name": "Privacy-Preserving Vision Agent (SIH26171)",
+  "version": "1.0.0",
+  "description": "Hybrid local client redaction engine & macro vision agent for privacy-preserving web automation.",
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "scripting",
+    "offscreen",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js"
   },

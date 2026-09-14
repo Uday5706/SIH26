@@ -3,23 +3,12 @@ import base64
 import json
 import time
 import uvicorn
-from fastapi import (
-    FastAPI,
-    HTTPException,
-    Depends,
-)
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from schemas import PlanRequest, PlanResponse
 from vlm_engine import VLMEngine
 from config import settings
-from auth.dependencies import get_current_user
-from auth.google import (
-    AuthenticatedUser,
-    GoogleTokenValidationError,
-    exchange_authorization_code,
-    validate_google_id_token,
-)
 
 app = FastAPI(
     title="SIH26171 Privacy-Preserving Vision Agent Server",
@@ -58,110 +47,8 @@ def read_root():
 def health_check():
     return {"status": "ok", "backend": settings.VLM_BACKEND_TYPE}
 
-@app.post("/api/v1/auth/google")
-async def google_auth(request: dict):
-    """
-    Exchange the Google authorization code for tokens and
-    validate the returned Google ID token.
-
-    The client secret remains on the FastAPI server.
-    """
-
-    code = request.get("code")
-    code_verifier = request.get("code_verifier")
-    redirect_uri = request.get("redirect_uri")
-    nonce = request.get("nonce")
-
-    if not code:
-        raise HTTPException(
-            status_code=400,
-            detail="Authorization code is required."
-        )
-
-    if not code_verifier:
-        raise HTTPException(
-            status_code=400,
-            detail="PKCE code verifier is required."
-        )
-
-    if not redirect_uri:
-        raise HTTPException(
-            status_code=400,
-            detail="Redirect URI is required."
-        )
-
-    if not nonce:
-        raise HTTPException(
-            status_code=400,
-            detail="OAuth nonce is required."
-        )
-
-    # Make sure the redirect URI is the one belonging to
-    # our Chrome extension.
-    if redirect_uri != settings.GOOGLE_REDIRECT_URI:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid OAuth redirect URI."
-        )
-
-    try:
-        # ---------------------------------------------------------
-        # 1. Exchange authorization code with Google
-        # ---------------------------------------------------------
-
-        token_data = await exchange_authorization_code(
-            code=code,
-            code_verifier=code_verifier,
-            redirect_uri=redirect_uri,
-        )
-
-        id_token_string = token_data.get("id_token")
-
-        if not id_token_string:
-            raise GoogleTokenValidationError(
-                "Google did not return an ID token."
-            )
-
-        # ---------------------------------------------------------
-        # 2. Cryptographically validate Google ID token
-        # ---------------------------------------------------------
-
-        user = await validate_google_id_token(
-            id_token_string=id_token_string,
-            expected_nonce=nonce,
-        )
-
-        # ---------------------------------------------------------
-        # 3. Return authenticated session information
-        # ---------------------------------------------------------
-
-        return {
-            "authenticated": True,
-            "idToken": id_token_string,
-            "accessToken": token_data.get("access_token"),
-            "expiresAt": user.expires_at * 1000,
-            "user": {
-                "sub": user.google_subject,
-                "email": user.email or "",
-                "email_verified": user.email_verified,
-            },
-        }
-
-    except GoogleTokenValidationError as exc:
-        raise HTTPException(
-            status_code=401,
-            detail=str(exc),
-        )
-
 @app.post("/api/v1/plan", response_model=PlanResponse)
-async def generate_action_plan(
-    request: PlanRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
-):
-    print( #for debugging
-    f"[Auth] Authorized request from "
-    f"{user.email or user.google_subject}"
-    )
+def generate_action_plan(request: PlanRequest):
     if not request.goal:
         raise HTTPException(status_code=400, detail="Goal prompt cannot be empty.")
     if not request.image:
