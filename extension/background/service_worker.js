@@ -81,8 +81,37 @@ async function ensureContentScriptInjected(tabId) {
 // Instantiate the controller
 const agentController = new AgentController(addLog, updateStatus, setupOffscreenDocument, ensureContentScriptInjected);
 
+// Side panel behavior & toolbar action
+chrome.action.onClicked.addListener(async (tab) => {
+  await chrome.sidePanel.open({ tabId: tab.id });
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch(() => {});
+});
+
 // Runtime Listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message) return;
+
+  // Relay between sidepanel and content script
+  if (message.target === "content" && sender.tab === undefined) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0]?.id;
+      if (tabId != null) {
+        chrome.tabs.sendMessage(tabId, message).catch(() => {});
+      }
+    });
+    return false;
+  }
+
+  if (message.target === "panel") {
+    chrome.runtime.sendMessage(message).catch(() => {});
+    return false;
+  }
+
   const { action, payload } = message;
 
   if (action === 'START_AGENT') {
