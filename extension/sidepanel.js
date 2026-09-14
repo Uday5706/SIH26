@@ -82,6 +82,12 @@ function resetStages() {
   setProgress(0);
 
   stageConfirmation.classList.add("hidden");
+  
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
+  }
 }
 
 function revealStatus(statusText) {
@@ -138,6 +144,14 @@ if (viewAuditBtn) {
     chrome.tabs.create({ url: `${currentServerUrl}/public/payload_audit.json` });
   });
 }
+
+// Bind suggestion chips
+document.querySelectorAll(".suggestion-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const prompt = chip.getAttribute("data-prompt") || chip.textContent.trim();
+    handleSend(prompt);
+  });
+});
 
 newTaskBtn.addEventListener("click", () => {
   resetAgent();
@@ -286,12 +300,19 @@ function startTask(taskText) {
 
   resetStages();
 
+  const welcomeBox = document.getElementById("welcomeBox");
+  if (welcomeBox) welcomeBox.style.display = "none";
+
   // Stage 1: Task text
   taskValue.textContent = taskText || "Execute privacy-preserving workflow";
   sessionLabel.textContent = "Current task";
 
   setAgentState("running", "Task initiated", "RUNNING");
-  stopBtn.hidden = false;
+  if (stopBtn) {
+    stopBtn.hidden = false;
+    stopBtn.classList.remove("hidden");
+    stopBtn.style.display = "flex";
+  }
   setProgress(10);
 }
 
@@ -321,7 +342,11 @@ function finishTask(message) {
   stopTimer();
   activeTask = false;
   pendingConfirmation = null;
-  stopBtn.hidden = true;
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
+  }
 
   setAgentState("success", "Task completed", "DONE");
   revealAction("Completed");
@@ -335,7 +360,11 @@ function failTask(message) {
   stopTimer();
   activeTask = false;
   pendingConfirmation = null;
-  stopBtn.hidden = true;
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
+  }
 
   setAgentState("error", "Agent stopped with an error", "ERROR");
   revealStep("Needs attention");
@@ -351,7 +380,11 @@ function stopCurrentTask(reason = "Stopped by user") {
   stopTimer();
   activeTask = false;
   pendingConfirmation = null;
-  stopBtn.hidden = true;
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
+  }
 
   setAgentState("waiting", reason, "STOPPED");
   revealStep("Agent execution cancelled");

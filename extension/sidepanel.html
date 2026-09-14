@@ -130,7 +130,26 @@
       </button>
     </section>
 
-    <main class="thread" id="thread"></main>
+    <main class="thread" id="thread">
+      <div class="welcome-box" id="welcomeBox">
+        <div class="welcome-title">🔒 Privacy Browser Agent</div>
+        <div class="welcome-desc">Automate browser tasks securely. Sensitive data is redacted locally before server transmission.</div>
+        <div class="suggestions-grid">
+          <button class="suggestion-chip" data-prompt="Fill out registration form securely">
+            <span>📝</span>
+            <span>Fill out registration form</span>
+          </button>
+          <button class="suggestion-chip" data-prompt="Scan page and redact all sensitive fields">
+            <span>🔍</span>
+            <span>Scan & redact sensitive fields</span>
+          </button>
+          <button class="suggestion-chip" data-prompt="Search for compiler design and submit">
+            <span>⚡</span>
+            <span>Search & navigate page</span>
+          </button>
+        </div>
+      </div>
+    </main>
 
     <div class="composer">
       <div class="composer-row">
@@ -155,7 +174,7 @@
 
       <div class="composer-foot">
         <span id="modelTag">Local privacy scan • Server reasoning</span>
-        <span class="privacy-badge">Raw data stays local</span>
+        <span class="privacy-badge">🔒 Raw data stays local</span>
       </div>
     </div>
 

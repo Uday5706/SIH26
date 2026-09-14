@@ -285,29 +285,93 @@ button, textarea { font: inherit; }
 }
 
 .stop-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   margin-top: 10px;
-  padding: 7px 10px;
-  border: 1px solid rgba(255,123,114,.28);
-  border-radius: 7px;
-  background: rgba(255,123,114,.06);
+  padding: 8px 10px;
+  border: 1px solid rgba(255,123,114,.35);
+  border-radius: 8px;
+  background: rgba(255,123,114,.08);
   color: var(--red);
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: .04em;
+  transition: all 0.2s ease;
 }
 
-.stop-btn:hover { background: rgba(255,123,114,.11); }
+.stop-btn:hover {
+  background: rgba(255,123,114,.16);
+  border-color: rgba(255,123,114,.5);
+}
+
+.stop-btn[hidden],
+.stop-btn.hidden {
+  display: none !important;
+}
 
 .stop-dot {
   display: inline-block;
   width: 7px;
   height: 7px;
-  margin-right: 5px;
+  margin-right: 6px;
   border-radius: 2px;
   background: currentColor;
+}
+
+/* ---------- Welcome Suggestions ---------- */
+.welcome-box {
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+
+.welcome-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.welcome-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 240px;
+}
+
+.suggestions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.suggestion-chip {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestion-chip:hover {
+  background: #212832;
+  border-color: var(--sky);
+  color: var(--sky);
 }
 
 @keyframes stageIn {
