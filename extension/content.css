@@ -1,0 +1,43 @@
+#__sentra_popup {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 320px;
+  background: #161b22;
+  color: #e6edf3;
+  border: 1px solid #262c36;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: -apple-system, "Segoe UI", Inter, Roboto, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  animation: __sentra_in 0.18s ease-out;
+}
+@keyframes __sentra_in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#__sentra_popup .__sentra_dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6ee7b7;
+  box-shadow: 0 0 0 3px rgba(110,231,183,0.15);
+  flex-shrink: 0;
+}
+#__sentra_popup .__sentra_text { flex: 1; }
+#__sentra_popup .__sentra_close {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+#__sentra_popup .__sentra_close:hover { color: #e6edf3; }
