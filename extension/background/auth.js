@@ -72,6 +72,10 @@ export async function loginWithGoogle(serverUrl) {
   const authorizationUrl =
     `${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`;
 
+  console.log('[Auth] Params:', Object.fromEntries(params.entries()));
+
+  console.log('[Auth] Authorization URL:', authorizationUrl);
+
   console.log('[Auth] Starting Google OAuth flow...');
   console.log('[Auth] Redirect URI:', redirectUri);
 

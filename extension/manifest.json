@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Privacy-Preserving Vision Agent (SIH26171)",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1QOSJM/D+4RvILRKsYbBxLGQ/F8XOb5vbpQj+HLHld5Kwe0OnDrIRrCPx9Kjsisk1rKLj1JLkSkYL2hi70V8WZIOvw776HFDINfAXWl9wZEVfxSJ/Wo/hRv30K1c2lV6+7a9phOq1AeSBN2uqVjsOQ7juWCVtfNywflwbv5BOnsHG/aIPwVH33wMD7ACAQpjaavIniT2vqau4KjchOwKZpRVhTW/lfdvIuuh4WD4gRPsj2pQpzroXs2KLqVPPidTxNcZxiuP/M7wCAM50jCjgGi1OKju+/8p2NTiM5JyKOvPOqncLiYnZ5LB7iFiLGqh/fNFOYG0xr7T3KNCDPbnhwIDAQAB",
   "version": "1.0.0",
   "description": "Hybrid local client redaction engine & macro vision agent for privacy-preserving web automation.",
   "permissions": [

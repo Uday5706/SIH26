@@ -45,3 +45,8 @@ yarn-error.log*
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+
+#extension key
+*.pem
+*.crx
