@@ -253,6 +253,45 @@ function handleSend() {
   runCaptureCycle(text);
 }
 
+// Global runtime listener for service worker updates
+chrome.runtime.onMessage.addListener((message) => {
+  const { action, payload } = message;
+  
+  if (action === 'STATUS_UPDATE') {
+    revealStatus(payload.status);
+    if (payload.isRunning) {
+        setAgentState("running", "Agent Active", "RUNNING");
+        stopBtn.hidden = false;
+        if (!timerId) startTimer();
+    }
+  }
+
+  if (action === 'LOG_EVENT') {
+    let logText = payload.entry || "Processing...";
+    if (typeof logText === 'object') {
+        if (logText.type === 'API_RESPONSE') {
+            logText = `Server responded: ${logText.status}`;
+        } else if (logText.type === 'API_REQUEST') {
+            logText = "Sending anonymized state to server...";
+        } else {
+            logText = JSON.stringify(logText);
+        }
+    }
+    
+    // We only update the step text if it's a short string (not a huge JSON dump)
+    if (logText.length < 100) {
+        revealStep(logText);
+        revealAction("Working...");
+    }
+  }
+  
+  if (action === 'EXECUTION_FINISHED') {
+    if (payload && payload.finished) {
+      finishTask("Goal Completed Successfully!");
+    }
+  }
+});
+
 function startTask(taskText) {
   activeTask = true;
   taskStartedAt = performance.now();
@@ -279,115 +318,24 @@ async function runCaptureCycle(taskText) {
   }
 
   startTask(taskText);
-
-  try {
-    /*
-      Stage 2: Agent status
-    */
-    await delay(1000);
-    if (!activeTask) return;
-
-    revealStatus("Observing page locally…");
-    setProgress(20);
-
-    /*
-      Stage 3: Current step
-    */
-    await delay(1100);
-    if (!activeTask) return;
-
-    revealStep("Scanning the current page");
-    setProgress(34);
-
-    /*
-      Stage 4: Elapsed time
-      Timer starts only when this stage appears.
-    */
-    await delay(1100);
-    if (!activeTask) return;
-
-    revealElapsed();
-    setProgress(42);
-
-    const scan = await runLocalScan();
-    if (!activeTask) return;
-
-    /*
-      Privacy processing remains visible as a status/step transition.
-    */
-    setAgentState("privacy", "Privacy scan passed", "PRIVACY");
-    revealStep("Sanitizing sensitive visual context locally…");
-    setProgress(55);
-
-    const steps = [
-      {
-        kind: "scan",
-        title: `Observed ${scan.elements} UI elements, ${scan.faces} face(s), ${scan.textFields} text field(s)`,
-        detail: scan.scanDetail || "Local visual/DOM analysis"
-      },
-      {
-        kind: "redact",
-        title: "Sensitive data protected before network transmission",
-        tags: (scan.redactions || []).map((r) => ({ label: r, type: "pii" }))
-      },
-      {
-        kind: "scan",
-        title: "Sanitized context ready for server reasoning",
-        detail: "Only safe structure, positions, and placeholder tags are exposed to the reasoning service.",
-        tags: [{ label: "payload: sanitized", type: "safe" }]
+  revealStatus("Initializing Agent...");
+  setProgress(20);
+  
+  chrome.runtime.sendMessage(
+    {
+      action: 'START_AGENT',
+      payload: { goal: taskText, serverUrl: 'http://127.0.0.1:8000' }
+    },
+    (response) => {
+      if (response && response.success) {
+        revealStep("Agent loop started in background.");
+        setProgress(40);
+        startTimer();
+      } else {
+        failTask("Failed to start agent.");
       }
-    ];
-
-    addTraceCard(steps, formatDuration(taskStartedAt));
-
-    /*
-      Stage 2 + 3 update as the agent progresses.
-    */
-    setAgentState("running", "Server reasoning", "RUNNING");
-    revealStep("Interpreting sanitized context…");
-    setProgress(66);
-
-    const serverResult = await callServer(scan.sanitizedPayload, taskText);
-    if (!activeTask) return;
-
-    if (serverResult?.needsConfirmation) {
-      /*
-        Stage 6 appears ONLY when confirmation is actually needed.
-      */
-      revealAction(serverResult.action || "Action requires approval");
-      revealConfirmation(serverResult.message);
-      pendingConfirmation = serverResult.actionPayload;
-
-      setAgentState("waiting", "Waiting for your confirmation", "WAITING");
-      setProgress(78);
-      return;
     }
-
-    /*
-      Stage 5: Action being performed
-    */
-    revealAction(serverResult?.action || "Executing browser action…");
-    revealStep(serverResult?.step || "Performing browser action…");
-    setAgentState("running", "Executing action", "RUNNING");
-    setProgress(88);
-
-    if (serverResult?.actionPayload) {
-      chrome.runtime.sendMessage({
-        target: "content",
-        type: "RUN_ACTION",
-        action: serverResult.actionPayload
-      }).catch(() => {});
-    }
-
-    finishTask(
-      serverResult?.followUp ||
-      scan.followUp ||
-      "Task completed successfully."
-    );
-  } catch (error) {
-    if (error?.name === "AbortError") return;
-    failTask(error?.message || "Something went wrong while running the task.");
-  }
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -442,10 +390,7 @@ function stopCurrentTask(reason = "Stopped by user") {
 
   addAgentText("Task stopped. No further browser actions will be executed.");
 
-  chrome.runtime.sendMessage({
-    target: "content",
-    type: "STOP_AGENT"
-  }).catch(() => {});
+  chrome.runtime.sendMessage({ action: 'STOP_AGENT' }).catch(() => {});
 
   if (typeof window.SentraAgent?.onStopRequested === "function") {
     window.SentraAgent.onStopRequested();
@@ -616,59 +561,6 @@ function scrollToBottom() {
 /* Frontend seams for backend/local model integration                         */
 /* -------------------------------------------------------------------------- */
 
-async function callServer(sanitizedPayload, taskText) {
-  /*
-    Replace ONLY this function with your backend API call.
-
-    Backend response:
-    {
-      action: "Executing click…",
-      step: "Executing click",
-      actionPayload: { ... },
-      needsConfirmation: false,
-      message: "...",
-      followUp: "Done — ..."
-    }
-  */
-  await delay(1600);
-
-  return {
-    action: "Executing click…",
-    step: "Executing click",
-    actionPayload: {
-      type: "toast",
-      message: "Sentra: sanitized context processed."
-    },
-    needsConfirmation: false,
-    followUp: "Done — the sanitized page context was processed and the action was applied."
-  };
-}
-
-async function runLocalScan() {
-  /*
-    Replace with the real local DOM / vision / redaction pipeline.
-    Never put raw PII or unredacted pixels in sanitizedPayload.
-  */
-  await delay(1200);
-
-  return {
-    elements: 14,
-    faces: 1,
-    textFields: 3,
-    redactions: [
-      "face → blurred",
-      "email → [EMAIL]",
-      "password → blacked out"
-    ],
-    sanitizedPayload: {
-      elements: 14,
-      safeRoles: ["input", "button", "heading"],
-      redactions: ["FACE", "EMAIL", "PASSWORD"]
-    },
-    scanDetail: "Local page scan • privacy filter active",
-    followUp: "Done — the sanitized context was processed and the action was applied."
-  };
-}
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));

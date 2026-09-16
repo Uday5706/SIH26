@@ -7,6 +7,10 @@
 // Initialize Side Panel behavior
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => console.error(error));
 
+chrome.action.onClicked.addListener(async (tab) => {
+  await chrome.sidePanel.open({ tabId: tab.id });
+});
+
 let agentState = {
   isRunning: false,
   status: 'Idle',
@@ -158,6 +162,7 @@ async function runAgentCycle(tabId) {
     const requestPayload = {
         goal: agentState.userGoal,
         image: redactedImageWebp,
+        unredacted_image: rawDataUrl,
         dom_snapshot: domSnapshot,
         viewport_size: viewportSize,
         session_id: agentSessionId,
@@ -165,8 +170,8 @@ async function runAgentCycle(tabId) {
         tab_info: { id: tabId }
     };
 
-    // Log the outgoing request payload (omitting the huge base64 string, but keeping dom_snapshot for the popup to render)
-    const debugPayload = { ...requestPayload, image: "<base64_image_data_omitted>" };
+    // Log the outgoing request payload (omitting the huge base64 strings, but keeping dom_snapshot for the popup to render)
+    const debugPayload = { ...requestPayload, image: "<base64_image_data_omitted>", unredacted_image: "<base64_image_data_omitted>" };
     
     // We send it as a raw object to the popup so it can format it
     addLog({ type: 'API_REQUEST', data: debugPayload });
@@ -260,10 +265,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       agentSessionId = null;
       updateStatus('Task execution finished!');
     } else if (agentState.isRunning) {
-      // Re-trigger cycle for dynamic page updates
+      // Re-trigger cycle for dynamic page updates with a 1s lag
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs.length > 0) {
-          runAgentCycle(tabs[0].id);
+          setTimeout(() => runAgentCycle(tabs[0].id), 1000);
         }
       });
     }

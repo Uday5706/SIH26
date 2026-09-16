@@ -16,7 +16,7 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background/service_worker.js"
   },
   "action": {
     "default_title": "Open Sentra",
