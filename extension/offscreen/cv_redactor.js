@@ -10,6 +10,7 @@ window.CVRedactor = (function () {
    * Fast canvas pixel scan detecting facial skin tones and circular profile avatars
    */
   function detectVisualPII(canvas) {
+    return []; // Disabled to prevent blocking the full name field
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;

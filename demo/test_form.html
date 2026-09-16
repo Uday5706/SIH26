@@ -118,8 +118,34 @@
           Aadhaar: 3672 8901 4523
         </p>
       </div>
+      
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #334155;">
+        <h3 style="margin-top: 0; color: #38bdf8;">Technical Skills Validation</h3>
+        <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:10px;">Select your primary domain of expertise to continue the onboarding process.</p>
+        
+        <div class="form-group">
+            <label for="skillSelect">Primary Skillset</label>
+            <select id="skillSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff;">
+                <option value="">-- Select a skill --</option>
+                <option value="frontend">Frontend Engineering (React/Vue)</option>
+                <option value="backend">Backend Engineering (Node/Python)</option>
+                <option value="ai">AI / Machine Learning</option>
+                <option value="security">Cybersecurity & Privacy</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="githubUrl">GitHub Profile URL</label>
+            <input type="text" id="githubUrl" name="githubUrl" placeholder="https://github.com/username">
+        </div>
+        
+        <div class="form-group">
+            <label for="bioText">Short Bio</label>
+            <textarea id="bioText" rows="3" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; box-sizing: border-box;" placeholder="Tell us about your background..."></textarea>
+        </div>
+      </div>
 
-      <button type="submit" id="btnSubmit" class="btn-submit">Submit Registration</button>
+      <button type="submit" id="btnSubmit" class="btn-submit" style="margin-top: 20px;">Submit Registration</button>
     </form>
   </div>
 </body>

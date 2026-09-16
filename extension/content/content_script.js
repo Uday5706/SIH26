@@ -14,6 +14,53 @@
       return true;
     }
 
+    function getSimplifiedDOM() {
+      const interactives = document.querySelectorAll('input, select, textarea, button, a, label, [role="button"], [role="link"], h1, h2, h3, h4');
+      let domLines = [];
+      
+      interactives.forEach(el => {
+         // Skip invisible or hidden elements
+         const rect = el.getBoundingClientRect();
+         if (rect.width === 0 || rect.height === 0 || el.type === 'hidden') return;
+         
+         // Only include elements that are near the current viewport to aggressively compress DOM
+         if (rect.bottom < -500 || rect.top > window.innerHeight + 1000) return;
+         
+         let str = `[${el.tagName.toLowerCase()}]`;
+         
+         // Extract useful attributes for the LLM
+         ['id', 'name', 'type', 'placeholder', 'for', 'aria-label'].forEach(attr => {
+             if (el.hasAttribute(attr)) {
+                 str += ` ${attr}="${el.getAttribute(attr)}"`;
+             }
+         });
+         
+         // Sync live values
+         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+             if (el.type === 'checkbox' || el.type === 'radio') {
+                 if (el.checked) str += ' checked';
+             } else if (el.value) {
+                 str += ` value="${el.value}"`;
+             }
+         }
+         
+         // Add absolute center coordinates
+         const cx = Math.round(rect.left + rect.width / 2);
+         const cy = Math.round(rect.top + rect.height / 2);
+         str += ` center="${cx},${cy}"`;
+         
+         // Extract inner text for buttons and labels
+         const text = el.textContent.trim().replace(/\s+/g, ' ');
+         if (text && el.tagName !== 'INPUT' && el.tagName !== 'SELECT') {
+             str += ` text="${text.substring(0, 100)}"`;
+         }
+         
+         domLines.push(str);
+      });
+      
+      return domLines.join('\n');
+    }
+
     if (action === 'SCAN_PII') {
       const domBoxes = window.PIIDomScanner ? window.PIIDomScanner.scan() : [];
       const textBoxes = window.PIITextScanner ? window.PIITextScanner.scan() : [];
@@ -22,11 +69,14 @@
       sendResponse({
         success: true,
         boundingBoxes: allBoxes,
+        dom_snapshot: getSimplifiedDOM(),
         viewport: {
           width: window.innerWidth,
           height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio || 1.0,
           scrollX: window.scrollX,
-          scrollY: window.scrollY
+          scrollY: window.scrollY,
+          cursor_position: window.MacroExecutor ? window.MacroExecutor.getCursorPosition() : null
         }
       });
       return true;

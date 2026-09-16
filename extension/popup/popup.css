@@ -26,10 +26,13 @@
 }
 
 body {
-  width: 370px;
+  width: 100%;
+  height: 100vh;
   background: var(--bg-dark);
   color: var(--text-main);
   padding: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .flat-card {
@@ -40,6 +43,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1;
+  overflow: hidden;
 }
 
 .app-header {
@@ -65,7 +70,13 @@ h1 {
   font-weight: 700;
   color: var(--text-main);
 }
-
+.main-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
 .badge {
   font-size: 0.65rem;
   background: var(--flat-badge-bg);
@@ -205,6 +216,13 @@ textarea:focus, input[type="text"]:focus {
   color: var(--text-muted);
 }
 
+.logs-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .logs-section h3 {
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -215,7 +233,8 @@ textarea:focus, input[type="text"]:focus {
 }
 
 .logs-container {
-  height: 90px;
+  flex: 1;
+  min-height: 150px;
   background: #0f172a;
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -231,6 +250,10 @@ textarea:focus, input[type="text"]:focus {
 .log-entry {
   color: #cbd5e1;
   word-break: break-all;
+  white-space: pre-wrap;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 .app-footer {

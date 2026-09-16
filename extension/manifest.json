@@ -8,7 +8,8 @@
     "scripting",
     "offscreen",
     "storage",
-    "tabs"
+    "tabs",
+    "sidePanel"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -18,8 +19,10 @@
     "type": "module"
   },
   "action": {
-    "default_popup": "popup/popup.html",
-    "default_title": "SIH26171 Vision Agent Dashboard"
+    "default_title": "Open Vision Agent Sidebar"
+  },
+  "side_panel": {
+    "default_path": "popup/popup.html"
   },
   "content_scripts": [
     {

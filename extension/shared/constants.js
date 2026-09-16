@@ -37,9 +37,9 @@ export const ACTION_TYPES = {
 
 export const DEFAULT_SETTINGS = {
   serverUrl: 'http://127.0.0.1:8000',
-  domRedactionEnabled: true,
-  textRedactionEnabled: true,
-  cvRedactionEnabled: true,
+  domRedactionEnabled: false,
+  textRedactionEnabled: false,
+  cvRedactionEnabled: false,
   redactionBufferPx: 5,
   autoExecutionDelayMs: 600
 };

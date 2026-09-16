@@ -92,10 +92,43 @@ document.addEventListener('DOMContentLoaded', () => {
     logs.forEach((log) => appendLog(log));
   }
 
-  function appendLog(text) {
+  function appendLog(logData) {
     const div = document.createElement('div');
     div.className = 'log-entry';
-    div.textContent = text;
+
+    if (typeof logData === 'string') {
+      // It's a standard string log
+      div.textContent = logData;
+    } else if (typeof logData === 'object') {
+      // It's a structured API log
+      if (logData.type === 'API_REQUEST') {
+        const payload = logData.data;
+        const domSnap = payload.dom_snapshot;
+        // Omit it from the stringify
+        const displayObj = { ...payload, dom_snapshot: "<DOM hidden in UI>" };
+        
+        let htmlStr = `<strong>[API Request] POST /plan</strong>\n`;
+        htmlStr += JSON.stringify(displayObj, null, 2);
+        
+        if (domSnap) {
+          // Escape HTML for safe insertion
+          const safeDom = domSnap.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          htmlStr += `\n<details style="margin-top:4px; padding:4px; background:#1e293b; border-radius:4px;">
+            <summary style="cursor:pointer; color:#38bdf8; font-weight:bold;">View DOM Snapshot</summary>
+            <div style="max-height:200px; overflow-y:auto; margin-top:4px; color:#94a3b8; font-size:0.65rem;">
+              ${safeDom}
+            </div>
+          </details>`;
+        }
+        div.innerHTML = htmlStr;
+      } else if (logData.type === 'API_RESPONSE') {
+        const htmlStr = `<strong>[API Response] Status: ${logData.status}</strong>\n` + JSON.stringify(logData.steps, null, 2);
+        div.innerHTML = htmlStr;
+      } else {
+        div.textContent = JSON.stringify(logData, null, 2);
+      }
+    }
+
     logsContainer.appendChild(div);
     logsContainer.scrollTop = logsContainer.scrollHeight;
   }

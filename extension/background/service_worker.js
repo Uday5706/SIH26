@@ -4,14 +4,17 @@
  * backend API transmission, and macro execution loops.
  */
 
+// Initialize Side Panel behavior
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => console.error(error));
+
 let agentState = {
   isRunning: false,
   status: 'Idle',
   userGoal: '',
   serverUrl: 'http://127.0.0.1:8000',
-  domRedactionEnabled: true,
-  textRedactionEnabled: true,
-  cvRedactionEnabled: true,
+  domRedactionEnabled: false,
+  textRedactionEnabled: false,
+  cvRedactionEnabled: false,
   redactionBufferPx: 5,
   logs: []
 };
@@ -88,18 +91,40 @@ async function ensureContentScriptInjected(tabId) {
   }
 }
 
+let agentSessionId = null;
+
+function generateSessionId() {
+  return 'sess_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+}
+
 // Core Execution Cycle
 async function runAgentCycle(tabId) {
   if (!agentState.isRunning) return;
 
   try {
+    if (!agentSessionId) {
+      agentSessionId = generateSessionId();
+      addLog(`Created new session: ${agentSessionId}`);
+    }
+
     updateStatus('Scanning DOM & Text PII...');
     await setupOffscreenDocument();
     await ensureContentScriptInjected(tabId);
 
     // Step 1: Scan Tier 1 & 2 PII bounding boxes from active content script
     const contentResponse = await chrome.tabs.sendMessage(tabId, { action: 'SCAN_PII' });
-    const boundingBoxes = (contentResponse && contentResponse.boundingBoxes) || [];
+    let boundingBoxes = (contentResponse && contentResponse.boundingBoxes) || [];
+    
+    // Filter out boxes if the user disabled them
+    if (!agentState.domRedactionEnabled) {
+        boundingBoxes = boundingBoxes.filter(b => b.type !== 'DOM_PII');
+    }
+    if (!agentState.textRedactionEnabled) {
+        boundingBoxes = boundingBoxes.filter(b => b.type !== 'TEXT_PII');
+    }
+    
+    const domSnapshot = (contentResponse && contentResponse.dom_snapshot) || '';
+    const viewportSize = (contentResponse && contentResponse.viewport) || { width: 1920, height: 1080 };
     addLog(`Scanned ${boundingBoxes.length} PII target bounding boxes.`);
 
     // Step 2: Capture screen state
@@ -127,14 +152,29 @@ async function runAgentCycle(tabId) {
 
     // Step 4: Transmit anonymized payload to backend FastAPI server
     updateStatus('Sending anonymized state to VLM server...');
+    
+    const tab = await chrome.tabs.get(tabId);
+    
+    const requestPayload = {
+        goal: agentState.userGoal,
+        image: redactedImageWebp,
+        dom_snapshot: domSnapshot,
+        viewport_size: viewportSize,
+        session_id: agentSessionId,
+        current_url: tab.url,
+        tab_info: { id: tabId }
+    };
+
+    // Log the outgoing request payload (omitting the huge base64 string, but keeping dom_snapshot for the popup to render)
+    const debugPayload = { ...requestPayload, image: "<base64_image_data_omitted>" };
+    
+    // We send it as a raw object to the popup so it can format it
+    addLog({ type: 'API_REQUEST', data: debugPayload });
+
     const response = await fetch(`${agentState.serverUrl}/api/v1/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        goal: agentState.userGoal,
-        image: redactedImageWebp,
-        tab_info: { id: tabId }
-      })
+      body: JSON.stringify(requestPayload)
     });
 
     if (!response.ok) {
@@ -143,7 +183,9 @@ async function runAgentCycle(tabId) {
 
     const planData = await response.json();
     const steps = planData.steps || [];
-    addLog(`VLM returned plan with ${steps.length} steps.`);
+    
+    // Log the incoming response steps as an object
+    addLog({ type: 'API_RESPONSE', status: planData.status, steps: steps });
 
     if (steps.length === 0 || planData.status === 'completed') {
       agentState.isRunning = false;
@@ -153,10 +195,14 @@ async function runAgentCycle(tabId) {
 
     // Step 5: Execute Macro Plan on tab
     updateStatus('Executing macro step plan...');
-    await chrome.tabs.sendMessage(tabId, {
-      action: 'EXECUTE_STEPS',
-      payload: { steps: steps }
-    });
+    try {
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'EXECUTE_STEPS',
+        payload: { steps: steps }
+      });
+    } catch (sendErr) {
+      addLog('Connection lost during execution (likely page navigation). Waiting for reload...');
+    }
 
   } catch (err) {
     console.error('Agent cycle error:', err);
@@ -190,6 +236,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (action === 'STOP_AGENT') {
     agentState.isRunning = false;
+    agentSessionId = null;
     updateStatus('Agent Stopped by User.');
     
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -210,6 +257,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (action === 'EXECUTION_FINISHED') {
     if (payload && payload.finished) {
       agentState.isRunning = false;
+      agentSessionId = null;
       updateStatus('Task execution finished!');
     } else if (agentState.isRunning) {
       // Re-trigger cycle for dynamic page updates
@@ -225,5 +273,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (payload && payload.message) {
       addLog(payload.message);
     }
+  }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && agentState.isRunning) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length > 0 && tabs[0].id === tabId) {
+        addLog('Page navigated. Re-injecting scripts and resuming cycle...');
+        // Small delay to let the page settle
+        setTimeout(() => runAgentCycle(tabId), 1000);
+      }
+    });
   }
 });

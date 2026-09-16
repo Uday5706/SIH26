@@ -56,6 +56,29 @@ def generate_action_plan(request: PlanRequest):
 
     print(f"[Server] Received plan request. Goal: '{request.goal}'")
 
+    global current_session_id
+    try:
+        current_session_id
+    except NameError:
+        current_session_id = None
+        
+    if request.session_id != current_session_id:
+        current_session_id = request.session_id
+        # Clear old snapshots for new task
+        try:
+            for filename in os.listdir(SNAPSHOTS_DIR):
+                if filename.endswith(".png"):
+                    os.remove(os.path.join(SNAPSHOTS_DIR, filename))
+            
+            # Clear server_responses.txt
+            log_path = os.path.join(PUBLIC_DIR, "server_responses.txt")
+            if os.path.exists(log_path):
+                open(log_path, 'w').close()
+                
+            print("[Server] Cleared previous snapshots and logs for new task.")
+        except Exception as e:
+            print(f"[Server] Failed to clear previous session data: {e}")
+
     # -------------------------------------------------------------
     # 1. Save Redacted Proof Image Snapshot to Disk
     # -------------------------------------------------------------
@@ -106,7 +129,7 @@ def generate_action_plan(request: PlanRequest):
     # -------------------------------------------------------------
     # 3. Generate VLM Trial & Error Action Plan
     # -------------------------------------------------------------
-    plan = VLMEngine.process_vision_plan(request.goal, request.image)
+    plan = VLMEngine.process_vision_plan(request)
     return plan
 
 if __name__ == "__main__":

@@ -40,9 +40,9 @@ class MockVLMEngine:
     """
 
     @staticmethod
-    def generate_plan(goal: str) -> PlanResponse:
-        session_memory.reset_if_new_goal(goal)
-        turn = session_memory.current_turn
+    def generate_plan(goal: str, session_id: str = "default") -> PlanResponse:
+        session = session_memory._get_or_create_session(session_id, goal)
+        turn = session["current_turn"]
         goal_lower = goal.lower()
 
         # Extract dynamic user details from goal prompt
@@ -85,9 +85,9 @@ class MockVLMEngine:
                 )
             ]
 
-            reasoned_steps = [session_memory.get_trial_and_error_fallback(s) for s in raw_steps]
+            reasoned_steps = [session_memory.get_trial_and_error_fallback(session_id, s) for s in raw_steps]
             for s in reasoned_steps:
-                session_memory.record_step_execution(s, success=True)
+                session_memory.record_step_execution(session_id, s, success=True)
 
             return PlanResponse(
                 status="in_progress",
@@ -119,9 +119,9 @@ class MockVLMEngine:
                 )
             ]
 
-            reasoned_steps = [session_memory.get_trial_and_error_fallback(s) for s in raw_steps]
+            reasoned_steps = [session_memory.get_trial_and_error_fallback(session_id, s) for s in raw_steps]
             for s in reasoned_steps:
-                session_memory.record_step_execution(s, success=True)
+                session_memory.record_step_execution(session_id, s, success=True)
 
             return PlanResponse(
                 status="in_progress",
@@ -130,7 +130,7 @@ class MockVLMEngine:
             )
 
         finish_step = ActionStep(action_type="finish")
-        session_memory.record_step_execution(finish_step, success=True)
+        session_memory.record_step_execution(session_id, finish_step, success=True)
         return PlanResponse(
             status="completed",
             message=f"VLM Engine: Task '{goal}' completed successfully.",
