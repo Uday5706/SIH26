@@ -17,7 +17,9 @@ class AgentSessionMemory:
                 "history": [],
                 "failed_selectors": {},
                 "current_turn": 0,
-                "last_goal": goal
+                "last_goal": goal,
+                "roadmap": [],
+                "current_step_index": 0
             }
         else:
             # Reset if goal changed within same session ID
@@ -26,11 +28,13 @@ class AgentSessionMemory:
                     "history": [],
                     "failed_selectors": {},
                     "current_turn": 0,
-                    "last_goal": goal
+                    "last_goal": goal,
+                    "roadmap": [],
+                    "current_step_index": 0
                 }
         return self.sessions[session_id]
 
-    def record_step_execution(self, session_id: str, step: ActionStep, success: bool = True, error: Optional[str] = None):
+    def record_step_execution(self, session_id: str, step: ActionStep, current_url: Optional[str] = None, success: bool = True, error: Optional[str] = None):
         session = self.sessions.get(session_id)
         if not session:
             return
@@ -38,6 +42,7 @@ class AgentSessionMemory:
         session["current_turn"] += 1
         record = {
             "turn": session["current_turn"],
+            "url": current_url,
             "action": step.action_type,
             "target": step.target_selector,
             "expected_outcome": step.expected_outcome,
@@ -51,6 +56,11 @@ class AgentSessionMemory:
             count = session["failed_selectors"].get(step.target_selector, 0) + 1
             session["failed_selectors"][step.target_selector] = count
             record["error"] = error
+
+        if hasattr(step, "roadmap") and step.roadmap:
+            session["roadmap"] = step.roadmap
+        if hasattr(step, "current_step_index") and step.current_step_index is not None:
+            session["current_step_index"] = step.current_step_index
 
         session["history"].append(record)
 

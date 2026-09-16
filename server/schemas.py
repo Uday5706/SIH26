@@ -25,6 +25,7 @@ class ViewportSize(BaseModel):
 class PlanRequest(BaseModel):
     goal: str = Field(..., description="User high-level prompt goal")
     image: str = Field(..., description="Anonymized WebP image base64 data URL")
+    unredacted_image: Optional[str] = Field(None, description="Raw unredacted image base64 data URL for testing")
     dom_snapshot: Optional[str] = Field(None, description="Simplified HTML or Accessibility Tree snapshot")
     viewport_size: Optional[ViewportSize] = Field(None, description="Viewport dimensions for coordinate scaling")
     session_id: Optional[str] = Field("default_session", description="Session ID for multi-turn state tracking")

@@ -31,7 +31,7 @@ class VLMEngine:
             else:
                 print(f"[VLM Engine] Loop detected on '{last_action}'. Forcing scroll down to break loop.")
                 fallback_step = ActionStep(action_type="scroll", value="down", timeout=3000)
-                session_memory.record_step_execution(session_id, fallback_step, success=True)
+                session_memory.record_step_execution(session_id, fallback_step, current_url=request_data.current_url, success=True)
                 return PlanResponse(
                     status="in_progress",
                     message="Loop detected. Forcing scroll to find new elements.",
@@ -55,15 +55,22 @@ class VLMEngine:
             # Query local Ollama API
             url = f"{settings.OLLAMA_URL}/api/generate"
             
+            session = session_memory._get_or_create_session(session_id, goal)
+            history = session_memory.get_history(session_id)
+            current_roadmap = session.get("roadmap", [])
+            current_pointer = session.get("current_step_index", 0)
+            
             prompt = (
                 f"You are a web automation Vision Agent.\n"
                 f"Goal: '{goal}'\n"
                 f"Past Actions: {json.dumps(history)}\n"
+                f"Current Roadmap: {json.dumps(current_roadmap)}\n"
+                f"Current Pointer: {current_pointer}\n"
                 f"{viewport_info}\n"
                 f"Current DOM Context (Simplified):\n{dom[:8000]}\n"
                 f"{loop_warning}\n"
                 "CRITICAL INSTRUCTIONS:\n"
-                "1. State Machine (MANDATORY): You must maintain a 'roadmap' (list of steps) and a 'current_step_index'. First, evaluate 'Past Actions'. Output 'last_action_evaluation': 'Success' or 'Failed: <reason>'. If Success, increment 'current_step_index'. If Failed, DO NOT increment the pointer; instead, try a DIFFERENT element or approach.\n"
+                "1. State Machine (MANDATORY): You must maintain a 'roadmap' (list of steps) and a 'current_step_index'. First, evaluate 'Past Actions' (e.g. check if the URL changed from the previous step). Output 'last_action_evaluation': 'Success' or 'Failed: <reason>'. If Success, increment 'current_step_index'. If Failed, DO NOT increment the pointer; instead, try a DIFFERENT element or approach.\n"
                 "2. Action Strategy: If an element is a button or link, use 'click'. If you need to reveal hidden menus, use 'hover'. If you need to type text, use 'type'.\n"
                 "3. Scrolling: ONLY emit 'scroll' if you need to see more of the page. NEVER scroll to find the main search bar.\n"
                 "4. Task Completion: If the goal has been fully met, you MUST emit action_type: 'finish'.\n"
@@ -141,7 +148,7 @@ class VLMEngine:
                             )
                             
                         # Record step in memory
-                        session_memory.record_step_execution(session_id, step, success=True)
+                        session_memory.record_step_execution(session_id, step, current_url=current_url, success=True)
                         parsed_steps.append(step)
                         
                     # Live Log export for user

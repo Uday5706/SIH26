@@ -80,25 +80,29 @@ def generate_action_plan(request: PlanRequest):
             print(f"[Server] Failed to clear previous session data: {e}")
 
     # -------------------------------------------------------------
-    # 1. Save Redacted Proof Image Snapshot to Disk
+    # 1. Save Proof Image Snapshots to Disk
     # -------------------------------------------------------------
     try:
+        # Save Redacted Image
         image_data = request.image
         if "," in image_data:
             image_data = image_data.split(",")[1]
-        
         image_bytes = base64.b64decode(image_data)
         
-        # Save as latest_redacted_frame.png
         latest_path = os.path.join(SNAPSHOTS_DIR, "latest_redacted_frame.png")
         with open(latest_path, "wb") as f:
             f.write(image_bytes)
 
-        # Save timestamped copy for audit history
-        timestamp = int(time.time())
-        history_path = os.path.join(SNAPSHOTS_DIR, f"redacted_frame_{timestamp}.png")
-        with open(history_path, "wb") as f:
-            f.write(image_bytes)
+        # Save Unredacted Image (if provided)
+        if request.unredacted_image:
+            unredacted_data = request.unredacted_image
+            if "," in unredacted_data:
+                unredacted_data = unredacted_data.split(",")[1]
+            unredacted_bytes = base64.b64decode(unredacted_data)
+            
+            unredacted_path = os.path.join(SNAPSHOTS_DIR, "latest_unredacted_frame.png")
+            with open(unredacted_path, "wb") as f:
+                f.write(unredacted_bytes)
 
         print(f"[Server Proof] Redacted frame proof saved to: {latest_path}")
     except Exception as e:
