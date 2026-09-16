@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Privacy-Preserving Vision Agent (SIH26171)",
+  "name": "Astra",
   "version": "1.0.0",
   "description": "Hybrid local client redaction engine & macro vision agent for privacy-preserving web automation.",
   "permissions": [
@@ -19,7 +19,7 @@
     "service_worker": "background/service_worker.js"
   },
   "action": {
-    "default_title": "Open Sentra",
+    "default_title": "Open Astra",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -45,3 +45,4 @@
     }
   ]
 }
+  

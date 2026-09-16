@@ -127,7 +127,7 @@ closeBtn.addEventListener("click", () => window.close());
 newTaskBtn.addEventListener("click", () => {
   resetAgent();
   thread.innerHTML = "";
-  sessionLabel.textContent = "Privacy Browser Agent";
+  sessionLabel.textContent = "Astra";
   input.focus();
 });
 
@@ -185,6 +185,7 @@ chrome.runtime.onMessage.addListener((message) => {
       We intentionally reveal the next UI stage only when its data arrives.
     */
     revealStatus(message.label || message.status || "Agent is working…");
+
     setAgentState(
       message.status || "running",
       message.label || "Agent is working…",
@@ -197,43 +198,78 @@ chrome.runtime.onMessage.addListener((message) => {
       })[message.status] || "RUNNING"
     );
 
-    if (message.progress != null) setProgress(message.progress);
+    if (message.progress != null) {
+      setProgress(message.progress);
+    }
 
-    if (message.step) revealStep(message.step);
-    if (message.showElapsed !== false) revealElapsed();
-    if (message.action) revealAction(message.action);
-    if (message.confirmation) revealConfirmation(message.confirmation);
+    if (message.step) {
+      revealStep(message.step);
+    }
+
+    if (message.showElapsed !== false) {
+      revealElapsed();
+    }
+
+    if (message.action) {
+      revealAction(message.action);
+    }
+
+    if (message.confirmation) {
+      revealConfirmation(message.confirmation);
+    }
+
     return;
   }
 
   if (message.type === "AGENT_STEP") {
     revealStep(message.step || "Processing…");
-    if (message.progress != null) setProgress(message.progress);
+
+    if (message.progress != null) {
+      setProgress(message.progress);
+    }
+
     return;
   }
 
   if (message.type === "AGENT_ACTION") {
     revealAction(message.action || "Executing browser action…");
     setAgentState("running", "Action in progress", "RUNNING");
-    if (message.progress != null) setProgress(message.progress);
+
+    if (message.progress != null) {
+      setProgress(message.progress);
+    }
+
     return;
   }
 
   if (message.type === "AGENT_CONFIRM") {
     revealConfirmation(message.message);
     pendingConfirmation = message.action;
-    setAgentState("waiting", "Waiting for your confirmation", "WAITING");
+
+    setAgentState(
+      "waiting",
+      "Waiting for your confirmation",
+      "WAITING"
+    );
+
     setProgress(message.progress ?? 78);
+
     return;
   }
 
   if (message.type === "AGENT_DONE") {
-    finishTask(message.message || "Task completed successfully.");
+    finishTask(
+      message.message || "Task completed successfully."
+    );
+
     return;
   }
 
   if (message.type === "AGENT_ERROR") {
-    failTask(message.message || "The agent could not complete this task.");
+    failTask(
+      message.message || "The agent could not complete this task."
+    );
+
     return;
   }
 });
@@ -244,9 +280,11 @@ chrome.runtime.onMessage.addListener((message) => {
 
 function handleSend() {
   const text = input.value.trim();
+
   if (!text) return;
 
   addUserMessage(text);
+
   input.value = "";
   input.style.height = "auto";
 
@@ -304,7 +342,12 @@ function startTask(taskText) {
   taskValue.textContent = taskText || "Scan current page";
   sessionLabel.textContent = "Current task";
 
-  setAgentState("running", "Task received", "RUNNING");
+  setAgentState(
+    "running",
+    "Task received",
+    "RUNNING"
+  );
+
   stopBtn.hidden = false;
 
   // Small delay makes the sequential UI visible even with a fast backend.
@@ -313,7 +356,10 @@ function startTask(taskText) {
 
 async function runCaptureCycle(taskText) {
   if (activeTask) {
-    addAgentText("A task is already running. Stop it before starting another.");
+    addAgentText(
+      "A task is already running. Stop it before starting another."
+    );
+
     return;
   }
 
@@ -336,6 +382,8 @@ async function runCaptureCycle(taskText) {
       }
     }
   );
+
+
 }
 
 /* -------------------------------------------------------------------------- */
@@ -344,13 +392,20 @@ async function runCaptureCycle(taskText) {
 
 function finishTask(message) {
   stopTimer();
+
   activeTask = false;
   pendingConfirmation = null;
   stopBtn.hidden = true;
 
-  setAgentState("success", "Task completed", "DONE");
+  setAgentState(
+    "success",
+    "Task completed",
+    "DONE"
+  );
+
   revealAction("Completed");
   revealStep("Finished");
+
   setProgress(100);
 
   addAgentText(message);
@@ -358,22 +413,32 @@ function finishTask(message) {
 
 function failTask(message) {
   stopTimer();
+
   activeTask = false;
   pendingConfirmation = null;
   stopBtn.hidden = true;
 
-  setAgentState("error", "Agent stopped with an error", "ERROR");
+  setAgentState(
+    "error",
+    "Agent stopped with an error",
+    "ERROR"
+  );
+
   revealStep("Needs attention");
   revealAction("Not completed");
+
   setProgress(100);
 
   addAgentText(message);
 }
 
-function stopCurrentTask(reason = "Stopped by user") {
+function stopCurrentTask(
+  reason = "Stopped by user"
+) {
   if (!activeTask) return;
 
   stopTimer();
+
   activeTask = false;
   pendingConfirmation = null;
   stopBtn.hidden = true;
@@ -383,29 +448,55 @@ function stopCurrentTask(reason = "Stopped by user") {
     abortController = null;
   }
 
-  setAgentState("waiting", reason, "STOPPED");
-  revealStep("Agent execution cancelled");
+  setAgentState(
+    "waiting",
+    reason,
+    "STOPPED"
+  );
+
+  revealStep(
+    "Agent execution cancelled"
+  );
+
   revealAction("Stopped");
+
   setProgress(100);
 
-  addAgentText("Task stopped. No further browser actions will be executed.");
+  addAgentText(
+    "Task stopped. No further browser actions will be executed."
+  );
 
   chrome.runtime.sendMessage({ action: 'STOP_AGENT' }).catch(() => {});
 
-  if (typeof window.SentraAgent?.onStopRequested === "function") {
+  /*
+    IMPORTANT:
+    Keep SentraAgent as the internal namespace.
+    This is not user-visible branding and may be referenced
+    by other extension files.
+  */
+  if (
+    typeof window.SentraAgent?.onStopRequested ===
+    "function"
+  ) {
     window.SentraAgent.onStopRequested();
   }
 }
 
-stopBtn.addEventListener("click", () => stopCurrentTask());
+stopBtn.addEventListener(
+  "click",
+  () => stopCurrentTask()
+);
 
 function resetAgent() {
   stopTimer();
+
   activeTask = false;
   taskStartedAt = null;
   pendingConfirmation = null;
   abortController = null;
+
   stopBtn.hidden = true;
+
   resetStages();
 }
 
@@ -415,25 +506,48 @@ function resetAgent() {
 
 function startTimer() {
   if (timerId) return;
-  if (taskStartedAt == null) taskStartedAt = performance.now();
+
+  if (taskStartedAt == null) {
+    taskStartedAt = performance.now();
+  }
 
   updateElapsed();
-  timerId = setInterval(updateElapsed, 47);
+
+  timerId = setInterval(
+    updateElapsed,
+    47
+  );
 }
 
 function stopTimer() {
-  if (timerId) clearInterval(timerId);
+  if (timerId) {
+    clearInterval(timerId);
+  }
+
   timerId = null;
 }
 
 function updateElapsed() {
   if (taskStartedAt == null) return;
 
-  const elapsed = Math.max(0, performance.now() - taskStartedAt);
+  const elapsed = Math.max(
+    0,
+    performance.now() - taskStartedAt
+  );
+
   const totalSeconds = elapsed / 1000;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  const hundredths = Math.floor((elapsed % 1000) / 10);
+
+  const minutes = Math.floor(
+    totalSeconds / 60
+  );
+
+  const seconds = Math.floor(
+    totalSeconds % 60
+  );
+
+  const hundredths = Math.floor(
+    (elapsed % 1000) / 10
+  );
 
   elapsedValue.textContent =
     `${String(minutes).padStart(2, "0")}:` +
@@ -447,114 +561,221 @@ function updateElapsed() {
 
 function addUserMessage(text) {
   const el = document.createElement("div");
+
   el.className = "msg msg-user";
 
-  const bubble = document.createElement("div");
+  const bubble =
+    document.createElement("div");
+
   bubble.className = "bubble";
   bubble.textContent = text;
 
   el.appendChild(bubble);
   thread.appendChild(el);
+
   scrollToBottom();
 }
 
 function addAgentText(text) {
   const el = document.createElement("div");
+
   el.className = "msg msg-agent";
 
-  const bubble = document.createElement("div");
+  const bubble =
+    document.createElement("div");
+
   bubble.className = "bubble";
   bubble.textContent = text;
 
   el.appendChild(bubble);
   thread.appendChild(el);
+
   scrollToBottom();
+
   return el;
 }
 
-function addTraceCard(steps, durationLabel) {
-  const wrap = document.createElement("div");
+function addTraceCard(
+  steps,
+  durationLabel
+) {
+  const wrap =
+    document.createElement("div");
+
   wrap.className = "msg msg-agent";
 
-  const trace = document.createElement("div");
+  const trace =
+    document.createElement("div");
+
   trace.className = "trace";
 
-  const head = document.createElement("div");
+  const head =
+    document.createElement("div");
+
   head.className = "trace-head";
+
   head.innerHTML = `
-    <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none">
-      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round"/>
+    <svg
+      class="chev"
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <path
+        d="M9 6l6 6-6 6"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </svg>
+
     <span>Agent trace • ${durationLabel}</span>
   `;
-  head.addEventListener("click", () => trace.classList.toggle("open"));
 
-  const body = document.createElement("div");
+  head.addEventListener(
+    "click",
+    () => trace.classList.toggle("open")
+  );
+
+  const body =
+    document.createElement("div");
+
   body.className = "trace-body";
 
   const icons = {
-    scan: `<svg class="step-icon scan" viewBox="0 0 24 24" fill="none">
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"
-            stroke="currentColor" stroke-width="1.8"/>
-      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
-    </svg>`,
-    redact: `<svg class="step-icon redact" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="3" width="18" height="18" rx="3"
-            stroke="currentColor" stroke-width="1.8"/>
-      <path d="M7 12h10" stroke="currentColor" stroke-width="2.5"/>
-    </svg>`,
-    act: `<svg class="step-icon act" viewBox="0 0 24 24" fill="none">
-      <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"
-            stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-    </svg>`
+    scan: `
+      <svg
+        class="step-icon scan"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <path
+          d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"
+          stroke="currentColor"
+          stroke-width="1.8"
+        />
+
+        <circle
+          cx="12"
+          cy="12"
+          r="3"
+          stroke="currentColor"
+          stroke-width="1.8"
+        />
+      </svg>
+    `,
+
+    redact: `
+      <svg
+        class="step-icon redact"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <rect
+          x="3"
+          y="3"
+          width="18"
+          height="18"
+          rx="3"
+          stroke="currentColor"
+          stroke-width="1.8"
+        />
+
+        <path
+          d="M7 12h10"
+          stroke="currentColor"
+          stroke-width="2.5"
+        />
+      </svg>
+    `,
+
+    act: `
+      <svg
+        class="step-icon act"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <path
+          d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linejoin="round"
+        />
+      </svg>
+    `
   };
 
   for (const s of steps) {
-    const row = document.createElement("div");
+    const row =
+      document.createElement("div");
+
     row.className = "step";
 
-    const bodyEl = document.createElement("div");
+    const bodyEl =
+      document.createElement("div");
+
     bodyEl.className = "step-body";
 
-    const title = document.createElement("div");
+    const title =
+      document.createElement("div");
+
     title.className = "step-title";
     title.textContent = s.title;
+
     bodyEl.appendChild(title);
 
     if (s.detail) {
-      const detail = document.createElement("div");
+      const detail =
+        document.createElement("div");
+
       detail.className = "step-detail";
       detail.textContent = s.detail;
+
       bodyEl.appendChild(detail);
     }
 
     if (s.tags?.length) {
-      const tagWrap = document.createElement("div");
+      const tagWrap =
+        document.createElement("div");
+
       for (const t of s.tags) {
-        const tag = document.createElement("span");
-        tag.className = `tag ${t.type || ""}`;
+        const tag =
+          document.createElement("span");
+
+        tag.className =
+          `tag ${t.type || ""}`;
+
         tag.textContent = t.label;
+
         tagWrap.appendChild(tag);
       }
+
       bodyEl.appendChild(tagWrap);
     }
 
-    row.innerHTML = icons[s.kind] || icons.scan;
+    row.innerHTML =
+      icons[s.kind] || icons.scan;
+
     row.appendChild(bodyEl);
     body.appendChild(row);
   }
 
   trace.appendChild(head);
   trace.appendChild(body);
+
   wrap.appendChild(trace);
   thread.appendChild(wrap);
+
   scrollToBottom();
+
   return trace;
 }
 
 function scrollToBottom() {
-  thread.scrollTop = thread.scrollHeight;
+  thread.scrollTop =
+    thread.scrollHeight;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -562,25 +783,53 @@ function scrollToBottom() {
 /* -------------------------------------------------------------------------- */
 
 
+
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(
+    resolve => setTimeout(resolve, ms)
+  );
 }
 
 function formatDuration(start) {
-  if (typeof start !== "number") return "00:00.00";
+  if (typeof start !== "number") {
+    return "00:00.00";
+  }
 
-  const elapsed = Math.max(0, performance.now() - start);
-  const totalSeconds = elapsed / 1000;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  const hundredths = Math.floor((elapsed % 1000) / 10);
+  const elapsed = Math.max(
+    0,
+    performance.now() - start
+  );
 
-  return `${String(minutes).padStart(2, "0")}:` +
-         `${String(seconds).padStart(2, "0")}.` +
-         `${String(hundredths).padStart(2, "0")}`;
+  const totalSeconds =
+    elapsed / 1000;
+
+  const minutes =
+    Math.floor(totalSeconds / 60);
+
+  const seconds =
+    Math.floor(totalSeconds % 60);
+
+  const hundredths =
+    Math.floor((elapsed % 1000) / 10);
+
+  return (
+    `${String(minutes).padStart(2, "0")}:` +
+    `${String(seconds).padStart(2, "0")}.` +
+    `${String(hundredths).padStart(2, "0")}`
+  );
 }
 
-/* Optional integration namespace for the backend developer. */
+/* -------------------------------------------------------------------------- */
+/* Internal integration namespace                                             */
+/* -------------------------------------------------------------------------- */
+
+/*
+  DO NOT rename SentraAgent unless you also update
+  every other file that references window.SentraAgent.
+
+  This is an internal JavaScript namespace and is not
+  displayed to the user.
+*/
 window.SentraAgent = {
   revealStatus,
   revealStep,
