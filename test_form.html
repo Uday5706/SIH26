@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentra PII Redaction Test Bench</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0b0f17;
+      color: #e2e8f0;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .card {
+      background: #151d2a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    h2 {
+      margin-top: 0;
+      color: #38bdf8;
+      font-size: 24px;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #cbd5e1;
+    }
+    input {
+      width: 100%;
+      padding: 10px 14px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 14px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      border-color: #38bdf8;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+    .badge-high {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+    .badge-mod {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: #0284c7;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>🔒 PII Redaction Test Bench</h2>
+    <p>This test page contains high and moderate sensitivity PII fields for verifying Sentra's local client-side redaction engine.</p>
+
+    <form onsubmit="return false;">
+      <div class="form-group">
+        <label for="fullName">Full Name <span class="badge badge-mod">MODERATE</span></label>
+        <input type="text" id="fullName" value="Alexander Hamilton" />
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address <span class="badge badge-mod">MODERATE</span></label>
+        <input type="email" id="email" value="alexander.hamilton@example.com" />
+      </div>
+
+      <div class="form-group">
+        <label for="cardNumber">Credit Card Number <span class="badge badge-high">HIGH (Mask)</span></label>
+        <input type="text" id="cardNumber" value="4532 8921 3401 9921" />
+      </div>
+
+      <div class="grid">
+        <div class="form-group">
+          <label for="password">Account Password <span class="badge badge-high">HIGH (Mask)</span></label>
+          <input type="password" id="password" value="SuperSecretPassword123!" />
+        </div>
+
+        <div class="form-group">
+          <label for="phone">Phone Number <span class="badge badge-mod">MODERATE</span></label>
+          <input type="tel" id="phone" value="+1 (555) 349-9201" />
+        </div>
+      </div>
+
+      <button type="submit" class="submit-btn">Save Profile</button>
+    </form>
+  </div>
+
+</body>
+</html>

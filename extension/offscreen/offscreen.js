@@ -1,7 +1,9 @@
 /**
  * Offscreen Document Canvas Obfuscator & Merger Engine
- * Combines 3-Tier bounding boxes with +5px padding buffer, paints solid black blackout masks,
- * and encodes final WebP image payload.
+ * Performs precision region-level redaction:
+ * - HIGH Sensitivity (Password, PIN, OTP, API Key): Tight solid opaque mask
+ * - LOW/MODERATE Sensitivity (Email, Phone, Name, Address): Tight localized canvas blur
+ * Preserves all surrounding webpage structure, layout, borders, and labels.
  */
 
 (function () {
@@ -10,13 +12,54 @@
   const canvas = document.getElementById('redactionCanvas');
   const ctx = canvas.getContext('2d');
 
+  const activeWorkers = {};
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'REDACT_CANVAS') {
-      const { dataUrl, boundingBoxes, paddingPx = 5, cvEnabled = true } = message.payload;
+      const { dataUrl, boundingBoxes, paddingPx = 2, cvEnabled = true } = message.payload;
 
       processImageAndRedact(dataUrl, boundingBoxes, paddingPx, cvEnabled)
         .then((result) => sendResponse({ success: true, result }))
         .catch((err) => sendResponse({ success: false, error: err.message }));
+
+      return true; // Keep channel open for async response
+    }
+
+    if (message.action === 'ML_WORKER_TASK') {
+      const { type, payload } = message;
+      
+      // Initialize worker if it doesn't exist
+      if (!activeWorkers[type]) {
+        let workerPath = '';
+        switch (type) {
+          case 'ocr': workerPath = '../perception/ocr-worker.js'; break;
+          case 'ner': workerPath = '../perception/ner-worker.js'; break;
+          case 'vision': workerPath = '../perception/ui-detector-worker.js'; break;
+          case 'face': workerPath = '../perception/face-worker.js'; break;
+          default: 
+            sendResponse({ status: 'error', error: `Unknown worker type: ${type}` });
+            return false;
+        }
+        
+        try {
+          activeWorkers[type] = new Worker(workerPath, { type: 'module' });
+          console.log(`[Offscreen] Spawned ${type} worker.`);
+        } catch (err) {
+          sendResponse({ status: 'error', error: err.message });
+          return false;
+        }
+      }
+
+      const worker = activeWorkers[type];
+
+      // Create a one-time listener for this specific task
+      const handleMessage = (e) => {
+        worker.removeEventListener('message', handleMessage);
+        sendResponse(e.data);
+      };
+
+      worker.addEventListener('message', handleMessage);
+      worker.postMessage(payload);
 
       return true; // Keep channel open for async response
     }
@@ -41,18 +84,53 @@
       }
     }
 
-    // Apply Solid Black Masking with +5px Buffer
-    ctx.fillStyle = '#000000';
     let redactedCount = 0;
+    const categoryCounts = {};
 
-    allBoxes.forEach((box) => {
+    // 1. Process MODERATE/LOW PII (Localized Blur) first
+    allBoxes.filter(b => b.sensitivity !== 'HIGH').forEach((box) => {
       const paddedX = Math.max(0, box.x - paddingPx);
       const paddedY = Math.max(0, box.y - paddingPx);
       const paddedW = Math.min(canvas.width - paddedX, box.width + paddingPx * 2);
       const paddedH = Math.min(canvas.height - paddedY, box.height + paddingPx * 2);
 
-      ctx.fillRect(paddedX, paddedY, paddedW, paddedH);
+      // Perform localized canvas blur
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(paddedX, paddedY, paddedW, paddedH);
+      ctx.clip();
+      ctx.filter = 'blur(10px)';
+      ctx.drawImage(canvas, 0, 0);
+      ctx.restore();
+
+      // Draw subtle boundary indicator box for visibility in test bench
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(paddedX, paddedY, paddedW, paddedH);
+
       redactedCount++;
+      const cat = box.category || 'PII_TEXT';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    });
+
+    // 2. Process HIGH PII (Complete Opaque Masking)
+    allBoxes.filter(b => b.sensitivity === 'HIGH').forEach((box) => {
+      const paddedX = Math.max(0, box.x - paddingPx);
+      const paddedY = Math.max(0, box.y - paddingPx);
+      const paddedW = Math.min(canvas.width - paddedX, box.width + paddingPx * 2);
+      const paddedH = Math.min(canvas.height - paddedY, box.height + paddingPx * 2);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(paddedX, paddedY, paddedW, paddedH);
+
+      // Draw high-security badge outline
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(paddedX, paddedY, paddedW, paddedH);
+
+      redactedCount++;
+      const cat = box.category || 'SECRET';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     });
 
     const redactedWebpDataUrl = canvas.toDataURL('image/webp', 0.85);
@@ -60,7 +138,8 @@
     return {
       redactedImageWebp: redactedWebpDataUrl,
       redactedCount: redactedCount,
-      boxSummary: allBoxes.map((b) => ({ type: b.type, reason: b.reason }))
+      categoryCounts: categoryCounts,
+      boxSummary: allBoxes.map((b) => ({ type: b.type, sensitivity: b.sensitivity, category: b.category }))
     };
   }
 
@@ -73,3 +152,4 @@
     });
   }
 })();
+

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Privacy-Preserving Vision Agent (SIH26171)",
+  "name": "Privacy-Preserving Vision Agent",
   "version": "1.0.0",
   "description": "Hybrid local client redaction engine & macro vision agent for privacy-preserving web automation.",
   "permissions": [
@@ -9,13 +9,15 @@
     "scripting",
     "offscreen",
     "storage",
-    "tabs"
+    "tabs",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background/service_worker.js",
+    "type": "module"
   },
   "action": {
     "default_title": "Open Sentra",
@@ -26,9 +28,7 @@
       "128": "icons/icon128.png"
     }
   },
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
+
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -38,7 +38,24 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": [
+        "privacy/token-vault.js",
+        "privacy/policy.js",
+        "privacy/fusion.js",
+        "content/dom-observer.js",
+        "content/page-extractor.js",
+        "content/pii_dom_scanner.js",
+        "content/pii_text_scanner.js",
+        "agent/action-guard.js",
+        "content/actions/executor.js",
+        "content/actions/click.js",
+        "content/actions/type.js",
+        "content/actions/scroll.js",
+        "content/actions/keypress.js",
+        "content/actions/wait.js",
+        "content/content_script.js",
+        "content.js"
+      ],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

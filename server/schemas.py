@@ -12,6 +12,7 @@ class ActionStep(BaseModel):
 class PlanRequest(BaseModel):
     goal: str = Field(..., description="User high-level prompt goal")
     image: str = Field(..., description="Anonymized WebP image base64 data URL")
+    sanitized_dom: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Sanitized DOM accessibility tree with [PII_*] placeholders")
     tab_info: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 class PlanResponse(BaseModel):

@@ -10,26 +10,22 @@
   <div class="app">
 
     <header class="topbar">
-      <button class="icon-btn" id="newTaskBtn" title="New task" aria-label="New task">
+      <!-- <button class="icon-btn" id="newTaskBtn" title="New task" aria-label="New task">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
-      </button>
+      </button> -->
 
       <button class="session-picker" id="sessionPicker" type="button">
-        <span class="dot dot-live"></span>
         <span id="sessionLabel">Privacy Browser Agent</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-          <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
       </button>
 
       <div class="topbar-right">
-        <button class="icon-btn" id="closeBtn" title="Close" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round"/>
+
+        <button class="icon-btn" id="profileBtn" title="Profile" aria-label="Profile">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
           </svg>
         </button>
       </div>
@@ -40,7 +36,7 @@
       This card intentionally reveals ONE stage at a time.
       Task -> Status -> Step -> Elapsed -> Action -> Confirmation.
     -->
-    <section class="agent-flow" id="agentFlow" aria-live="polite">
+    <section class="agent-flow hidden" id="agentFlow" hidden aria-live="polite">
 
       <div class="flow-header">
         <div class="agent-brand">
@@ -50,7 +46,12 @@
             <div class="agent-subtitle" id="flowSubtitle">Ready for a task</div>
           </div>
         </div>
-        <span class="status-pill ready" id="statusPill">READY</span>
+        <span class="status-pill ready hidden" id="statusPill" style="display:none;">READY</span>
+        <button id="stopBtn" class="stop-icon-btn" title="Stop task" aria-label="Stop task">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+          </svg>
+        </button>
       </div>
 
       <!-- Stage 1: Task -->
@@ -113,29 +114,47 @@
         </div>
       </div>
 
+      <!-- Stage 7: Dry Run Payload -->
+      <div class="flow-stage hidden" id="stageDryRun">
+        <span class="stage-marker" style="background:#38bdf8; color:#0b0f17;">DR</span>
+        <div class="stage-content" style="width: 100%;">
+          <div class="stage-label" style="color:#38bdf8; font-weight:bold;">DRY RUN — NOT SENT</div>
+          <div class="stage-value" style="margin-top:8px;">
+            <pre id="dryRunPayload" style="background:#07090e; color:#a5f3fc; padding:10px; border-radius:6px; font-family:monospace; font-size:11px; max-height:300px; overflow-y:auto; white-space:pre-wrap; border:1px solid #1e293b;"></pre>
+          </div>
+        </div>
+      </div>
+
       <div class="flow-progress">
         <div class="progress-track">
           <div class="progress-bar" id="progressBar"></div>
         </div>
       </div>
-
-      <button id="stopBtn" class="stop-btn" hidden>
-        <span class="stop-dot"></span>
-        STOP
-      </button>
     </section>
 
-    <main class="thread" id="thread"></main>
+    <main class="thread" id="thread">
+      <div class="welcome-box" id="welcomeBox">
+        <div class="welcome-title">Privacy Browser Agent</div>
+        <div class="welcome-desc">Automate browser tasks securely. </div>
+        <div class="suggestions-grid">
+          <button class="suggestion-chip" data-prompt="Fill out registration form securely">
+            <span>📝</span>
+            <span>Fill out registration form</span>
+          </button>
+          <button class="suggestion-chip" data-prompt="Scan page and redact all sensitive fields">
+            <span>🔍</span>
+            <span>Scan & redact sensitive fields</span>
+          </button>
+          <button class="suggestion-chip" data-prompt="Search for compiler design and submit">
+            <span>⚡</span>
+            <span>Search & navigate page</span>
+          </button>
+        </div>
+      </div>
+    </main>
 
     <div class="composer">
       <div class="composer-row">
-        <button class="icon-btn ghost" id="captureBtn" title="Scan current page" aria-label="Scan current page">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-
         <textarea id="composerInput"
           placeholder="Tell Sentra what to do on this page…"
           rows="1"></textarea>
@@ -150,7 +169,7 @@
 
       <div class="composer-foot">
         <span id="modelTag">Local privacy scan • Server reasoning</span>
-        <span class="privacy-badge">🔒 Raw data stays local</span>
+        <span class="privacy-badge">Sensitive data stays local</span>
       </div>
     </div>
 

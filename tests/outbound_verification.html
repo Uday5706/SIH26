@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRIVAGENT - Outbound Payload Verification</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --card-bg: #151d2a;
+      --border: #1e293b;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.15);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --success: #4ade80;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 30px 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+    header h1 {
+      font-size: 24px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header p {
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 24px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #334155;
+      color: #94a3b8;
+    }
+    .badge.green { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+    .badge.red { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    input, textarea {
+      background: #0b0f17;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+    .btn {
+      background: var(--accent);
+      color: #0b0f17;
+      font-weight: 700;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:hover {
+      background: #7dd3fc;
+      transform: translateY(-1px);
+    }
+    .terminal-box {
+      background: #07090e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: #a5f3fc;
+      overflow: auto;
+      max-height: 480px;
+      white-space: pre-wrap;
+    }
+    .assertions-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13.5px;
+    }
+    .assertions-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #0f1622;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .assertions-list li.pass { border-left: 3px solid var(--success); }
+    .assertions-list li.fail { border-left: 3px solid var(--danger); }
+    .status-icon { font-weight: bold; }
+    .info-callout {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>🛡️ PRIVAGENT Outbound Payload Verification</h1>
+    <p>Simulates the exact sanitized JSON payload generated after local perception, Token Vault processing, and Privacy Gate scrubbing before network transmission.</p>
+  </header>
+
+  <div class="info-callout">
+    💡 <strong>Where to see the log:</strong> The exact sanitized object is logged below in the terminal viewer <em>AND</em> directly in your <strong>Browser DevTools Console</strong> (press <code>F12</code> or Right Click &gt; <code>Inspect</code> &gt; <code>Console</code>). You can also run <code>node tests/test_outbound_payload_verification.js</code> in your terminal.
+  </div>
+
+  <div class="grid">
+    <!-- Left Column: Raw DOM Form containing Representative PII -->
+    <div class="card">
+      <h2>
+        1. Simulated Browser DOM (Raw PII)
+        <span class="badge red">SENSITIVE LOCAL STATE</span>
+      </h2>
+      <p style="font-size: 13px; color: var(--text-muted);">This raw sensitive data lives strictly inside the browser and must NEVER leave the device.</p>
+
+      <div class="form-group">
+        <label for="input-name">Full Name (PERSON):</label>
+        <input type="text" id="input-name" value="Alexander Hamilton">
+      </div>
+
+      <div class="form-group">
+        <label for="input-email">Email Address (EMAIL):</label>
+        <input type="email" id="input-email" value="alexander.hamilton@treasury.gov">
+      </div>
+
+      <div class="form-group">
+        <label for="input-phone">Phone Number (PHONE):</label>
+        <input type="tel" id="input-phone" value="+1-555-019-8372">
+      </div>
+
+      <div class="form-group">
+        <label for="input-card">Credit Card (HIGH SENSITIVITY):</label>
+        <input type="text" id="input-card" value="4242-4242-4242-4242">
+      </div>
+
+      <div class="form-group">
+        <label for="input-ssn">SSN (HIGH SENSITIVITY):</label>
+        <input type="text" id="input-ssn" value="123-45-6789">
+      </div>
+
+      <div class="form-group">
+        <label for="input-notes">Notes Field (Raw text containing PII):</label>
+        <textarea id="input-notes" rows="2">Meeting with Alexander Hamilton regarding confidential account +1-555-019-8372.</textarea>
+      </div>
+
+      <button id="btn-run-gate" class="btn">
+        🚀 Process Pipeline &amp; Inspect Outbound Payload
+      </button>
+    </div>
+
+    <!-- Right Column: Verification Results & Outbound Payload -->
+    <div class="card">
+      <h2>
+        2. Outbound Payload for Server Brain
+        <span id="payload-badge" class="badge green">READY TO INSPECT</span>
+      </h2>
+
+      <div class="terminal-box" id="payload-output">// Click "Process Pipeline & Inspect Outbound Payload" to generate...</div>
+
+      <h2>3. Automated Assertions</h2>
+      <ul class="assertions-list" id="assertions-list">
+        <li style="color: var(--text-muted);">Awaiting execution...</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="../extension/privacy/token-vault.js"></script>
+<script type="module">
+  import { PrivacyGate } from '../extension/background/privacy_gate.js';
+
+  // Enable verbose payload logging for inspection
+  PrivacyGate.setVerboseLogging(true);
+
+  const btnRun = document.getElementById('btn-run-gate');
+  const payloadOutput = document.getElementById('payload-output');
+  const assertionsList = document.getElementById('assertions-list');
+  const payloadBadge = document.getElementById('payload-badge');
+
+  btnRun.addEventListener('click', () => {
+    // 1. Read Raw PII from the DOM elements
+    const rawName = document.getElementById('input-name').value;
+    const rawEmail = document.getElementById('input-email').value;
+    const rawPhone = document.getElementById('input-phone').value;
+    const rawCard = document.getElementById('input-card').value;
+    const rawSsn = document.getElementById('input-ssn').value;
+    const rawNotes = document.getElementById('input-notes').value;
+
+    const rawPII = {
+      name: rawName,
+      email: rawEmail,
+      phone: rawPhone,
+      creditCard: rawCard,
+      ssn: rawSsn
+    };
+
+    // 2. Token Vault processing: Replace moderate PII with semantic tokens
+    const vault = window.SentraTokenVault;
+    vault.reset();
+
+    const nameToken = vault.tokenize('PERSON', rawName);
+    const emailToken = vault.tokenize('EMAIL', rawEmail);
+    const phoneToken = vault.tokenize('PHONE', rawPhone);
+    const sanitizedNotes = vault.sanitizeString(rawNotes);
+
+    // 3. Construct candidate outbound payload
+    // Note: Simulated DOM/A11y tree + vision metadata
+    const candidatePayload = {
+      meta: {
+        url: window.location.href,
+        title: "PRIVAGENT Outbound Verification",
+        revision: 1,
+        timestamp: Date.now()
+      },
+      elements: [
+        {
+          id: "input-name",
+          role: "textbox",
+          label: "Full Name",
+          value: nameToken, // [PERSON_01]
+          bounds: { x: 30, y: 150, w: 320, h: 36 }
+        },
+        {
+          id: "input-email",
+          role: "textbox",
+          label: "Email Address",
+          value: emailToken, // [EMAIL_01]
+          bounds: { x: 30, y: 220, w: 320, h: 36 }
+        },
+        {
+          id: "input-phone",
+          role: "textbox",
+          label: "Phone Number",
+          value: phoneToken, // [PHONE_01]
+          bounds: { x: 30, y: 290, w: 320, h: 36 }
+        },
+        {
+          id: "input-card",
+          role: "textbox",
+          label: "Credit Card",
+          // High sensitivity PII is either dropped or scrubbed by PrivacyGate
+          value: rawCard
+        },
+        {
+          id: "input-ssn",
+          role: "textbox",
+          label: "SSN",
+          value: rawSsn
+        },
+        {
+          id: "input-notes",
+          role: "textbox",
+          label: "Notes",
+          value: sanitizedNotes
+        }
+      ],
+      vision: [
+        {
+          type: "FACE",
+          bbox: [100, 100, 50, 50],
+          confidence: 0.98
+        }
+      ]
+    };
+
+    // 4. Run through PrivacyGate
+    console.clear();
+    console.log("%c=== PRIVAGENT OUTBOUND GATE EXECUTION ===", "color: #38bdf8; font-weight: bold; font-size: 14px;");
+    const result = PrivacyGate.validatePayload(candidatePayload);
+    const sanitizedObj = result.sanitizedPayload;
+    const serialized = JSON.stringify(sanitizedObj, null, 2);
+
+    // 5. Display the exact sanitized payload on screen
+    payloadOutput.textContent = serialized;
+
+    // 6. Execute automated assertions against serialized payload
+    assertionsList.innerHTML = '';
+    let allPassed = true;
+
+    function addAssertion(name, passed, detail) {
+      const li = document.createElement('li');
+      li.className = passed ? 'pass' : 'fail';
+      li.innerHTML = `
+        <span class="status-icon">${passed ? '✅' : '❌'}</span>
+        <div>
+          <strong>${name}:</strong> ${detail}
+        </div>
+      `;
+      assertionsList.appendChild(li);
+      if (!passed) allPassed = false;
+    }
+
+    // Check each raw PII value
+    Object.entries(rawPII).forEach(([key, val]) => {
+      const leaked = serialized.includes(val);
+      addAssertion(
+        `Zero Leakage (${key})`,
+        !leaked,
+        !leaked ? `Raw value successfully scrubbed from payload` : `LEAK DETECTED: "${val}" found in output!`
+      );
+    });
+
+    // Check semantic tokens preserved
+    const hasTokens = serialized.includes(emailToken) && serialized.includes(phoneToken) && serialized.includes(nameToken);
+    addAssertion(
+      'Semantic Tokens Preserved',
+      hasTokens,
+      hasTokens ? `Tokens (${nameToken}, ${emailToken}, ${phoneToken}) present and intact` : `Missing expected semantic tokens`
+    );
+
+    // Check high-sensitivity replacements
+    const hasScrubbed = serialized.includes('[BLOCKED_CREDIT_CARD]') && serialized.includes('[BLOCKED_SSN]');
+    addAssertion(
+      'Deep Scrubbing Placeholders',
+      hasScrubbed,
+      hasScrubbed ? `Found [BLOCKED_CREDIT_CARD] & [BLOCKED_SSN]` : `Deep-scrub placeholders missing`
+    );
+
+    // Check Token Vault boundary
+    const tokenVaultLeaked = serialized.includes('tokenToReal') || serialized.includes('realToToken');
+    addAssertion(
+      'TokenVault Isolation',
+      !tokenVaultLeaked,
+      !tokenVaultLeaked ? 'TokenVault internal mappings are NEVER serialized into payload' : 'CRITICAL: TokenVault leaked!'
+    );
+
+    if (allPassed) {
+      payloadBadge.textContent = "ALL 8 ASSERTIONS PASSED ✅";
+      payloadBadge.className = "badge green";
+    } else {
+      payloadBadge.textContent = "ASSERTION FAILED ❌";
+      payloadBadge.className = "badge red";
+    }
+
+    console.log("%cVerification Complete. Result: " + (allPassed ? "PASSED" : "FAILED"), allPassed ? "color: #4ade80; font-weight: bold;" : "color: #f87171; font-weight: bold;");
+  });
+
+  // Auto-run on page load
+  btnRun.click();
+</script>
+
+</body>
+</html>

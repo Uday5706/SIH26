@@ -2,125 +2,772 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SIH26171 Privacy Test Environment</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIH26171 Synthetic Privacy Test Bench</title>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <script src="../extension/content/pii_dom_scanner.js"></script>
+  <script src="../extension/content/pii_text_scanner.js"></script>
   <style>
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0f172a;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #0b1120;
       color: #f8fafc;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       min-height: 100vh;
       margin: 0;
+      padding: 30px 20px;
     }
-    .container {
+    .wrapper {
+      display: grid;
+      grid-template-columns: 520px 520px;
+      gap: 24px;
+      max-width: 1080px;
+      width: 100%;
+    }
+    .card {
       background: #1e293b;
-      padding: 30px;
+      padding: 24px 26px;
       border-radius: 16px;
-      width: 460px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid #334155;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
     h2 {
       margin-top: 0;
       color: #38bdf8;
+      font-size: 1.35rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+
+    /* Control Toolbar */
+    .toolbar {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toolbar-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .btn-random {
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.15s, filter 0.15s;
+    }
+    .btn-random:hover {
+      filter: brightness(1.15);
+      transform: translateY(-1px);
+    }
+    .toolbar select {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .privacy-badge-box {
+      background: rgba(5, 150, 105, 0.15);
+      border: 1px solid #059669;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 18px;
+    }
+    .badge-title {
+      font-weight: bold;
+      color: #34d399;
+      font-size: 0.86rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .detected-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .tag {
+      font-size: 0.72rem;
+      background: #0f172a;
+      padding: 3px 7px;
+      border-radius: 5px;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+    }
+    .tag.high {
+      border-color: #ef4444;
+      color: #fca5a5;
+    }
+    .tag.mod {
+      border-color: #38bdf8;
+      color: #bae6fd;
+    }
+    .tag.non-pii {
+      border-color: #10b981;
+      color: #a7f3d0;
+    }
+
+    /* Dynamic Form Grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .form-grid.single-col {
+      grid-template-columns: 1fr;
     }
     .form-group {
-      margin-bottom: 16px;
+      margin-bottom: 4px;
+    }
+    .col-span-2 {
+      grid-column: span 2;
     }
     label {
       display: block;
-      margin-bottom: 6px;
-      font-size: 0.85rem;
-      color: #94a3b8;
+      margin-bottom: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #cbd5e1;
     }
-    input {
+    .label-meta {
+      font-size: 0.7rem;
+      font-weight: normal;
+      color: #94a3b8;
+      margin-left: 4px;
+    }
+    .label-meta.high { color: #f87171; font-weight: 600; }
+    .label-meta.mod { color: #38bdf8; }
+    .label-meta.safe { color: #34d399; }
+
+    input, select, textarea {
       width: 100%;
-      padding: 10px;
+      padding: 8px 11px;
       border-radius: 8px;
       border: 1px solid #334155;
       background: #0f172a;
       color: #fff;
+      font-size: 0.85rem;
       box-sizing: border-box;
+      font-family: inherit;
     }
-    .profile-card {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      background: #0f172a;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 20px;
+    textarea {
+      resize: vertical;
+      min-height: 52px;
     }
-    .avatar {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #f43f5e, #fb923c);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #38bdf8;
     }
-    button {
+    .btn-submit {
       width: 100%;
-      padding: 12px;
-      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      padding: 11px;
+      background: #2563eb;
       border: none;
       border-radius: 8px;
       color: white;
       font-weight: bold;
-      font-size: 1rem;
+      font-size: 0.9rem;
       cursor: pointer;
+      margin-top: 14px;
+      transition: background 0.2s;
+    }
+    .btn-submit:hover {
+      background: #1d4ed8;
+    }
+
+    /* Context & Preview Panel */
+    .context-panel {
+      background: #0f172a;
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid #334155;
+      height: fit-content;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .context-title {
+      font-weight: bold;
+      font-size: 0.92rem;
+      color: #38bdf8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #redactionCanvasPreview {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #1e293b;
+    }
+    .section-header {
+      font-size: 0.82rem;
+      font-weight: bold;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+    .comparison-container {
+      background: #1e293b;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .comparison-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      padding: 5px 0;
+      border-bottom: 1px dashed #334155;
+    }
+    .comparison-row:last-child {
+      border-bottom: none;
+    }
+    .raw-val { color: #fca5a5; }
+    .tx-val { color: #86efac; font-weight: bold; }
+    .safe-val { color: #94a3b8; }
+
+    .json-preview {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.73rem;
+      background: #1e293b;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: #a5f3fc;
+      overflow-y: auto;
+      max-height: 220px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      border: 1px solid #334155;
+      margin: 0;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Synthetic Privacy Test Bench</h2>
-    <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:20px;">
-      Test 3-Tier Redaction Engine (Tier 1 DOM + Tier 2 Text/Luhn + Tier 3 CV).
-    </p>
+  <div class="wrapper">
+    <!-- Main Synthetic Test Form Card -->
+    <div class="card" id="formCard">
+      <h2>🛡️ Synthetic Privacy Test Bench</h2>
+      <p class="subtitle">
+        Regions containing sensitive PII are redacted locally prior to VLM transmission while preserving complete surrounding webpage structure.
+      </p>
 
-    <div class="profile-card">
-      <div class="avatar">👤</div>
-      <div>
-        <strong style="color:#fff;">Target User Profile</strong><br>
-        <span style="font-size:0.8rem; color:#94a3b8;">Email: alex.privacy@example.com</span>
+      <!-- Dynamic Randomization Controls -->
+      <div class="toolbar">
+        <div class="toolbar-row">
+          <div style="font-size:0.8rem; color:#94a3b8; font-weight:600;">Scenario:</div>
+          <select id="scenarioSelect" onchange="applyScenario(this.value)">
+            <option value="chaos">🎲 Random Chaos (Shuffled)</option>
+            <option value="ecommerce">💳 E-Commerce & Payment</option>
+            <option value="healthcare">🏥 Healthcare & Intake</option>
+            <option value="devops">☁️ Cloud Credentials & API</option>
+            <option value="hr">👤 HR Employee Onboarding</option>
+          </select>
+        </div>
+        <div class="toolbar-row">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="font-size:0.78rem; color:#94a3b8;">Layout:</span>
+            <select id="layoutSelect" onchange="changeLayout(this.value)">
+              <option value="mixed">Dynamic 2-Col Grid</option>
+              <option value="single">Single Column</option>
+            </select>
+          </div>
+          <button class="btn-random" onclick="randomizeCurrentForm()">
+            <span>🔀 Randomize Inputs & Values</span>
+          </button>
+        </div>
       </div>
+
+      <!-- Live Dynamic Privacy Badge -->
+      <div class="privacy-badge-box">
+        <div class="badge-title">🔒 Privacy Protected & Field Inspector</div>
+        <div style="font-size:0.75rem; color:#a7f3d0;">
+          Green fields are transmitted normally; cyan fields are blurred; red fields are opaque masked.
+        </div>
+        <div class="detected-tags" id="dynamicDetectedTags">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Dynamically Generated Form -->
+      <form id="privacyForm" onsubmit="event.preventDefault(); alert('Action executed locally with original DOM values!');">
+        <div class="form-grid" id="dynamicFormContainer">
+          <!-- Populated by JavaScript -->
+        </div>
+        <button type="submit" id="btnSubmit" class="btn-submit">Submit Registration</button>
+      </form>
     </div>
 
-    <form id="privacyForm" onsubmit="event.preventDefault(); alert('Form submitted!');">
-      <div class="form-group">
-        <label for="fullName">Full Name</label>
-        <input type="text" id="fullName" name="fullName" placeholder="Full Name" value="Alex Rivera">
+    <!-- Live Context Inspector Panel -->
+    <div class="context-panel">
+      <div class="context-title">
+        <span>👁️ Live Redacted Preview</span>
+        <span style="font-size:0.74rem; color:#34d399;">● Real-Time Canvas</span>
+      </div>
+      
+      <canvas id="redactionCanvasPreview"></canvas>
+
+      <div class="context-title" style="margin-top: 6px;">
+        <span>📄 View Sanitized Context</span>
+        <span style="font-size:0.75rem; color:#94a3b8; font-weight:normal;">Transmitted vs Local</span>
       </div>
 
-      <div class="form-group">
-        <label for="emailInput">Email Address (Tier 2 Text Redaction)</label>
-        <input type="email" id="emailInput" name="email" value="alex.rivera@example.com">
+      <div>
+        <div class="section-header">Field Transformation Audit:</div>
+        <div class="comparison-container" id="transformationsList">
+          <!-- Populated by JS -->
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="passInput">Password (Tier 1 DOM Redaction)</label>
-        <input type="password" id="passInput" name="password" value="SuperSecretPassword123!">
+      <div>
+        <div class="section-header">Structured DOM Payload (Sent to VLM):</div>
+        <pre class="json-preview" id="jsonPreview">[]</pre>
       </div>
-
-      <div class="form-group">
-        <label for="cardNumberInput">Credit Card (Tier 2 Luhn Validated)</label>
-        <input type="text" id="cardNumberInput" name="card" autocomplete="cc-number" value="4532 0123 4567 8910">
-      </div>
-
-      <div class="form-group">
-        <label>Aadhaar Number (Tier 2 Regex)</label>
-        <p style="font-size:0.9rem; background:#0f172a; padding:8px; border-radius:6px; margin:0;">
-          Aadhaar: 3672 8901 4523
-        </p>
-      </div>
-
-      <button type="submit" id="btnSubmit" class="btn-submit">Submit Registration</button>
-    </form>
+    </div>
   </div>
+
+  <script>
+    // =========================================================================
+    // Rich Field Pool (High PII, Moderate PII, and Safe / Non-Sensitive Fields)
+    // =========================================================================
+    const FIELD_POOL = {
+      // HIGH SENSITIVITY FIELDS (Solid Opaque Mask)
+      creditCard: {
+        id: 'cardNum', name: 'card', type: 'text', autocomplete: 'cc-number',
+        label: 'Credit Card Number', metaClass: 'high', metaText: '(HIGH - Opaque Mask)',
+        values: ['4532 0123 4567 8910', '5425 2334 3211 4455', '3782 822463 10005', '6011 4523 8976 1234'],
+        span: 'col-span-2'
+      },
+      cvv: {
+        id: 'cardCvv', name: 'cvv', type: 'password', autocomplete: 'cc-csc',
+        label: 'Security Code (CVV)', metaClass: 'high', metaText: '(HIGH - Opaque Mask)',
+        values: ['842', '129', '703', '491'],
+        span: ''
+      },
+      password: {
+        id: 'userPassword', name: 'password', type: 'password', autocomplete: 'current-password',
+        label: 'Account Password', metaClass: 'high', metaText: '(HIGH - Opaque Mask)',
+        values: ['SuperSecretPass123!', 'AlphaNumeric#2026', 'P@ssw0rdSecure!'],
+        span: 'col-span-2'
+      },
+      pin: {
+        id: 'userPin', name: 'pin', type: 'password', autocomplete: 'off',
+        label: 'Security PIN', metaClass: 'high', metaText: '(HIGH - Opaque Mask)',
+        values: ['7412', '9034', '1182', '5621'],
+        span: ''
+      },
+      otp: {
+        id: 'verificationOtp', name: 'otp', type: 'text', autocomplete: 'one-time-code',
+        label: 'OTP Verification Code', metaClass: 'high', metaText: '(HIGH - Opaque Mask)',
+        values: ['849201', '318492', '901245', '442109'],
+        span: ''
+      },
+      apiKey: {
+        id: 'cloudApiKey', name: 'api_key', type: 'text', autocomplete: 'off',
+        label: 'Cloud API Secret Key', metaClass: 'high', metaText: '(HIGH - Opaque Mask)',
+        values: ['sk_live_99887766554433221100', 'sk_live_11223344556677889900', 'pk_live_sec_abcdef9876543210'],
+        span: 'col-span-2'
+      },
+      token: {
+        id: 'bearerAuthToken', name: 'token', type: 'text', autocomplete: 'off',
+        label: 'Session Auth Token', metaClass: 'high', metaText: '(HIGH - Opaque Mask)',
+        values: ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDasdf1234567890', 'token_auth_9988112233445566'],
+        span: 'col-span-2'
+      },
+
+      // MODERATE SENSITIVITY FIELDS (Localized Frosted Blur)
+      fullName: {
+        id: 'fullNameInput', name: 'fullName', type: 'text', autocomplete: 'name',
+        label: 'Full Legal Name', metaClass: 'mod', metaText: '(Low/Mod PII - Blur)',
+        values: ['Alex Rivera', 'Elena Rostova', 'Marcus Vance', 'Sophia Chen', 'David Kim'],
+        span: ''
+      },
+      email: {
+        id: 'emailInput', name: 'email', type: 'email', autocomplete: 'email',
+        label: 'Email Address', metaClass: 'mod', metaText: '(Low/Mod PII - Blur)',
+        values: ['alex.rivera@example.com', 'elena.rostova@corporate.org', 'marcus.v@techops.io'],
+        span: ''
+      },
+      phone: {
+        id: 'phoneInput', name: 'phone', type: 'tel', autocomplete: 'tel',
+        label: 'Phone Number', metaClass: 'mod', metaText: '(Low/Mod PII - Blur)',
+        values: ['+1 (555) 234-5678', '+44 20 7946 0912', '+91 98765 43210', '+1 (555) 890-1234'],
+        span: ''
+      },
+      address: {
+        id: 'streetAddress', name: 'address', type: 'text', autocomplete: 'street-address',
+        label: 'Billing / Street Address', metaClass: 'mod', metaText: '(Low/Mod PII - Blur)',
+        values: ['123 Privacy Lane, Suite 400', '742 Evergreen Terrace', '10 Downing Street', '456 Cyber Way'],
+        span: 'col-span-2'
+      },
+      city: {
+        id: 'cityInput', name: 'city', type: 'text', autocomplete: 'address-level2',
+        label: 'City / Location', metaClass: 'mod', metaText: '(Low/Mod PII - Blur)',
+        values: ['San Francisco, CA', 'London, UK', 'Bengaluru, India', 'Zurich, Switzerland'],
+        span: ''
+      },
+
+      // SAFE / NON-SENSITIVE FIELDS (Zero Redaction - Remains Completely Visible)
+      promoCode: {
+        id: 'promoCodeInput', name: 'promoCode', type: 'text', autocomplete: 'off',
+        label: 'Promo / Referral Code', metaClass: 'safe', metaText: '(Non-Sensitive - Untouched)',
+        values: ['SUMMER26', 'PRIVACY_HERO', 'DISCOUNT15', 'OCTOBER_PROMO'],
+        span: ''
+      },
+      currency: {
+        id: 'currencySelect', name: 'currency', type: 'select',
+        label: 'Settlement Currency', metaClass: 'safe', metaText: '(Non-Sensitive - Untouched)',
+        options: ['USD ($) United States', 'EUR (€) European Union', 'GBP (£) British Pound', 'INR (₹) Indian Rupee'],
+        span: ''
+      },
+      deliveryNotes: {
+        id: 'deliveryNotesText', name: 'deliveryNotes', type: 'textarea',
+        label: 'Delivery Instructions', metaClass: 'safe', metaText: '(Non-Sensitive - Untouched)',
+        values: ['Leave parcel at reception desk.', 'Ring bell twice upon arrival.', 'Deliver before 5:00 PM.', 'My backup credit card is 4532 0123 4567 8910 in case you need it.'],
+        span: 'col-span-2'
+      },
+      department: {
+        id: 'deptSelect', name: 'department', type: 'select',
+        label: 'Department Unit', metaClass: 'safe', metaText: '(Non-Sensitive - Untouched)',
+        options: ['Security Engineering', 'Data Privacy Office', 'Platform Architecture', 'Customer Experience'],
+        span: ''
+      },
+      jobTitle: {
+        id: 'jobTitleInput', name: 'jobTitle', type: 'text',
+        label: 'Job Title / Role', metaClass: 'safe', metaText: '(Non-Sensitive - Untouched)',
+        values: ['Staff Systems Architect', 'Security Analyst', 'Lead DevOps Engineer'],
+        span: ''
+      }
+    };
+
+    // Pre-defined Scenario Configurations
+    const SCENARIOS = {
+      chaos: ['fullName', 'email', 'phone', 'address', 'password', 'pin', 'otp', 'creditCard', 'cvv', 'apiKey', 'promoCode', 'deliveryNotes'],
+      ecommerce: ['fullName', 'email', 'address', 'creditCard', 'cvv', 'currency', 'promoCode', 'deliveryNotes'],
+      healthcare: ['fullName', 'phone', 'email', 'city', 'pin', 'otp', 'deliveryNotes'],
+      devops: ['fullName', 'email', 'department', 'password', 'apiKey', 'token', 'jobTitle'],
+      hr: ['fullName', 'email', 'phone', 'address', 'department', 'jobTitle', 'password', 'pin']
+    };
+
+    let currentScenarioKey = 'chaos';
+    let currentLayout = 'mixed';
+
+    function getRandomItem(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    // Build Dynamic Form HTML
+    function buildForm(fieldsToRender, randomizeOrder = false) {
+      let fields = randomizeOrder ? shuffleArray(fieldsToRender) : fieldsToRender;
+      const container = document.getElementById('dynamicFormContainer');
+      container.className = currentLayout === 'single' ? 'form-grid single-col' : 'form-grid';
+
+      let html = '';
+      fields.forEach(fieldKey => {
+        const field = FIELD_POOL[fieldKey];
+        if (!field) return;
+
+        const spanClass = currentLayout === 'single' ? '' : (field.span || '');
+        const val = field.values ? getRandomItem(field.values) : '';
+
+        html += `<div class="form-group ${spanClass}">`;
+        html += `<label for="${field.id}">${field.label} <span class="label-meta ${field.metaClass}">${field.metaText}</span></label>`;
+
+        if (field.type === 'textarea') {
+          html += `<textarea id="${field.id}" name="${field.name}">${val}</textarea>`;
+        } else if (field.type === 'select') {
+          html += `<select id="${field.id}" name="${field.name}">`;
+          field.options.forEach(opt => {
+            html += `<option value="${opt}">${opt}</option>`;
+          });
+          html += `</select>`;
+        } else {
+          html += `<input type="${field.type}" id="${field.id}" name="${field.name}" value="${val}" autocomplete="${field.autocomplete || 'off'}">`;
+        }
+        html += `</div>`;
+      });
+
+      container.innerHTML = html;
+      
+      // Update dynamic tags
+      updateTags(fields);
+    }
+
+    function updateTags(fieldKeys) {
+      const tagsContainer = document.getElementById('dynamicDetectedTags');
+      let tagsHtml = '';
+
+      fieldKeys.forEach(key => {
+        const field = FIELD_POOL[key];
+        if (!field) return;
+        let icon = '📄';
+        if (field.metaClass === 'high') icon = '🔒';
+        else if (field.metaClass === 'mod') icon = '🛡️';
+        else if (field.metaClass === 'safe') icon = '✅';
+
+        tagsHtml += `<span class="tag ${field.metaClass}">${icon} ${field.label.split(' ')[0]}</span>`;
+      });
+
+      tagsContainer.innerHTML = tagsHtml;
+    }
+
+    function applyScenario(scenarioKey) {
+      currentScenarioKey = scenarioKey;
+      const fields = SCENARIOS[scenarioKey] || SCENARIOS.chaos;
+      buildForm(fields, scenarioKey === 'chaos');
+      runSimulation();
+    }
+
+    function randomizeCurrentForm() {
+      if (currentScenarioKey === 'chaos') {
+        // Pick a random subset of 7 to 11 fields from all available
+        const allKeys = Object.keys(FIELD_POOL);
+        const shuffled = shuffleArray(allKeys);
+        const count = 7 + Math.floor(Math.random() * 5);
+        buildForm(shuffled.slice(0, count), true);
+      } else {
+        const fields = SCENARIOS[currentScenarioKey];
+        buildForm(fields, true);
+      }
+      runSimulation();
+    }
+
+    function changeLayout(layout) {
+      currentLayout = layout;
+      document.getElementById('dynamicFormContainer').className = layout === 'single' ? 'form-grid single-col' : 'form-grid';
+      runSimulation();
+    }
+
+    // =========================================================================
+    // Real-Time Privacy Scanner & Pixel-Perfect Canvas Redaction
+    // =========================================================================
+    async function runSimulation() {
+      // 1. Scan DOM using the actual extension scanner
+      const domResult = window.PIIDomScanner.scan();
+      const textBoxes = window.PIITextScanner.scan();
+      const allBoxes = [...domResult.boundingBoxes, ...textBoxes];
+      const sanitizedDom = domResult.sanitizedDom;
+
+      // Update JSON preview (Transmitted to VLM)
+      const previewDom = sanitizedDom.filter(el => el.has_value).map(el => ({
+        role: el.role,
+        semantic_type: el.semantic_type,
+        label: el.label,
+        has_value: el.has_value,
+        value: el.value,
+        sensitivity: el.sensitivity,
+        bbox: el.bbox
+      }));
+      document.getElementById('jsonPreview').textContent = JSON.stringify(previewDom, null, 2);
+
+      // Update Transformations list
+      const transformHTML = sanitizedDom.filter(el => el.has_value).map(el => {
+        let rawVal = document.querySelector(el.selector)?.value || document.querySelector(el.selector)?.textContent || '';
+        rawVal = rawVal.trim();
+        if (rawVal.length > 20) rawVal = rawVal.substring(0, 20) + '...';
+
+        if (el.sensitivity === 'HIGH') {
+          return `
+          <div class="comparison-row">
+            <span>${el.label || el.semantic_type}:</span>
+            <span><span class="raw-val">••••••••</span> → <span class="tx-val">${el.value}</span></span>
+          </div>`;
+        } else if (el.sensitivity === 'MODERATE') {
+          return `
+          <div class="comparison-row">
+            <span>${el.label || el.semantic_type}:</span>
+            <span><span class="raw-val">${rawVal}</span> → <span class="tx-val">${el.value}</span></span>
+          </div>`;
+        } else {
+          return `
+          <div class="comparison-row">
+            <span style="color:#94a3b8;">${el.label || 'Safe Field'}:</span>
+            <span class="safe-val">${rawVal} (Untouched)</span>
+          </div>`;
+        }
+      }).join('');
+      document.getElementById('transformationsList').innerHTML = transformHTML || '<div style="color:#94a3b8; font-size:0.75rem;">No fields currently populated.</div>';
+
+      // 2. Generate Pixel-Perfect Screenshot Preview
+      const formCard = document.getElementById('formCard');
+      const cardRect = formCard.getBoundingClientRect();
+      
+      const scale = window.devicePixelRatio || 1;
+      const canvas = await html2canvas(formCard, {
+        backgroundColor: '#1e293b',
+        scale: scale,
+        logging: false,
+        useCORS: true
+      });
+      
+      const previewCanvas = document.getElementById('redactionCanvasPreview');
+      previewCanvas.width = canvas.width;
+      previewCanvas.height = canvas.height;
+      const ctx = previewCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, 0);
+
+      // Scaling factors from CSS pixels to canvas bitmap pixels
+      const scaleX = canvas.width / cardRect.width;
+      const scaleY = canvas.height / cardRect.height;
+      const cornerRadius = 6 * scaleX;
+
+      // Card bounds in document coordinates
+      const cardDocLeft = cardRect.left + window.scrollX;
+      const cardDocTop = cardRect.top + window.scrollY;
+
+      // Draw each sensitive region strictly inside its element boundary
+      allBoxes.forEach(box => {
+        let relX, relY, relW, relH;
+
+        if (box.element && formCard.contains(box.element)) {
+          // Direct pixel-perfect element bounds relative to formCard
+          const elRect = box.element.getBoundingClientRect();
+          relX = elRect.left - cardRect.left;
+          relY = elRect.top - cardRect.top;
+          relW = elRect.width;
+          relH = elRect.height;
+        } else {
+          // Text-node box: filter out any boxes from the right panel or outside the formCard
+          if (
+            box.x < cardDocLeft - 2 ||
+            box.x + box.width > cardDocLeft + cardRect.width + 2 ||
+            box.y < cardDocTop - 2 ||
+            box.y + box.height > cardDocTop + cardRect.height + 2
+          ) {
+            return;
+          }
+          relX = box.x - cardDocLeft;
+          relY = box.y - cardDocTop;
+          relW = box.width;
+          relH = box.height;
+        }
+
+        const drawX = Math.round(relX * scaleX);
+        const drawY = Math.round(relY * scaleY);
+        const drawW = Math.round(relW * scaleX);
+        const drawH = Math.round(relH * scaleY);
+
+        if (drawW <= 0 || drawH <= 0) return;
+
+        if (box.sensitivity === 'HIGH') {
+          // ==========================================
+          // HIGH SENSITIVITY: Complete Opaque Mask
+          // Guarantees Credit Card, Password, PIN, OTP, API Key are 100% hidden
+          // ==========================================
+          ctx.save();
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(drawX, drawY, drawW, drawH, cornerRadius);
+          } else {
+            ctx.rect(drawX, drawY, drawW, drawH);
+          }
+          
+          // Solid opaque fill
+          ctx.fillStyle = '#0f172a';
+          ctx.fill();
+
+          // Distinct security border
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 1.5 * scaleX;
+          ctx.stroke();
+
+          // Centered security badge
+          ctx.fillStyle = '#f87171';
+          ctx.font = `600 ${Math.max(10, Math.round(11 * scaleX))}px Inter, -apple-system, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const labelText = `🔒 ${box.placeholder || '[HIGH_PII]'}`;
+          ctx.fillText(labelText, drawX + drawW / 2, drawY + drawH / 2);
+          ctx.restore();
+
+        } else if (box.sensitivity === 'MODERATE') {
+          // ==========================================
+          // LOW/MODERATE SENSITIVITY: Localized Frosted Blur
+          // Strictly clipped to the input box so ZERO label text is blurred
+          // ==========================================
+          ctx.save();
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(drawX, drawY, drawW, drawH, cornerRadius);
+          } else {
+            ctx.rect(drawX, drawY, drawW, drawH);
+          }
+          ctx.clip();
+
+          // Localized Gaussian blur
+          ctx.filter = `blur(${Math.round(8 * scaleX)}px)`;
+          ctx.drawImage(canvas, 0, 0);
+
+          // Translucent dark frost tint
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+          ctx.fill();
+          ctx.restore();
+
+          // Clean cyan border
+          ctx.save();
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(drawX, drawY, drawW, drawH, cornerRadius);
+          } else {
+            ctx.rect(drawX, drawY, drawW, drawH);
+          }
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+          ctx.lineWidth = 1.2 * scaleX;
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
+    }
+
+    // Initialize on load
+    window.onload = () => {
+      applyScenario('chaos');
+      // Listen for typing / input changes
+      document.getElementById('privacyForm').addEventListener('input', () => {
+        runSimulation();
+      });
+    };
+  </script>
 </body>
 </html>

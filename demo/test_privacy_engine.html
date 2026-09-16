@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIH26171 Privacy Engine Test Suite</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 40px 24px;
+    }
+    h1 {
+      color: #38bdf8;
+      font-size: 1.5rem;
+      margin-bottom: 6px;
+    }
+    .test-subtitle {
+      color: #94a3b8;
+      font-size: 0.85rem;
+      margin-bottom: 28px;
+    }
+    .summary-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding: 14px 20px;
+      background: #1e293b;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .summary-bar .pass { color: #4ade80; }
+    .summary-bar .fail { color: #f87171; }
+    .summary-bar .total { color: #94a3b8; }
+    .test-group {
+      background: #1e293b;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .test-group-title {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #38bdf8;
+      margin-bottom: 12px;
+    }
+    .test-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #1e293b;
+      font-size: 0.82rem;
+    }
+    .test-row:last-child { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: bold;
+      min-width: 42px;
+      text-align: center;
+    }
+    .badge.pass { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid #4ade80; }
+    .badge.fail { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid #f87171; }
+    .test-name { color: #e2e8f0; flex: 1; }
+    .test-detail { color: #64748b; font-size: 0.75rem; font-family: 'Fira Code', monospace; }
+
+    /* Hidden test fixture forms — these are the actual DOM inputs the scanners will analyze */
+    #testFixtures {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Privacy Engine Test Suite</h1>
+  <p class="test-subtitle">Client-side tests for the extension's PII detection &amp; sanitization engine. All redaction happens locally before any data leaves the browser.</p>
+
+  <div class="summary-bar" id="summaryBar">
+    <span class="total">Running...</span>
+  </div>
+
+  <div id="testResults"></div>
+
+  <!-- Hidden DOM fixtures for scanner to analyze -->
+  <div id="testFixtures">
+    <form id="testForm">
+      <label for="tf_name">Full Name</label>
+      <input type="text" id="tf_name" name="fullName" value="Alex Rivera">
+
+      <label for="tf_email">Email</label>
+      <input type="email" id="tf_email" name="email" value="alex.rivera@example.com">
+
+      <label for="tf_phone">Phone</label>
+      <input type="tel" id="tf_phone" name="phone" value="+1 (555) 234-5678">
+
+      <label for="tf_address">Address</label>
+      <input type="text" id="tf_address" name="address" value="123 Privacy Lane, Suite 400">
+
+      <label for="tf_password">Password</label>
+      <input type="password" id="tf_password" name="password" value="SuperSecretPass123!">
+
+      <label for="tf_pin">PIN</label>
+      <input type="password" id="tf_pin" name="pin" value="7412" maxlength="4">
+
+      <label for="tf_otp">OTP Verification Code</label>
+      <input type="text" id="tf_otp" name="otp" value="849201">
+
+      <label for="tf_card">Credit Card</label>
+      <input type="text" id="tf_card" name="card" autocomplete="cc-number" value="4532 0123 4567 8910">
+
+      <label for="tf_apikey">API Key</label>
+      <input type="text" id="tf_apikey" name="api_key" value="sk_live_99887766554433221100">
+    </form>
+  </div>
+
+  <!-- Load the actual extension scanner modules -->
+  <script src="../extension/content/pii_dom_scanner.js"></script>
+  <script src="../extension/content/pii_text_scanner.js"></script>
+
+  <script>
+    // =========================================================================
+    // Test Runner
+    // =========================================================================
+    const results = [];
+
+    function assert(testName, condition, detail = '') {
+      results.push({ name: testName, passed: !!condition, detail });
+    }
+
+    function renderResults() {
+      const passed = results.filter(r => r.passed).length;
+      const failed = results.filter(r => !r.passed).length;
+
+      document.getElementById('summaryBar').innerHTML = `
+        <span class="pass">✓ ${passed} Passed</span>
+        <span class="fail">${failed > 0 ? '✗ ' + failed + ' Failed' : ''}</span>
+        <span class="total">${results.length} Total</span>
+      `;
+
+      // Group results by prefix (e.g. "DOM:" or "Text:")
+      const groups = {};
+      results.forEach(r => {
+        const [group, ...rest] = r.name.split(': ');
+        const key = group || 'General';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push({ ...r, shortName: rest.join(': ') || r.name });
+      });
+
+      let html = '';
+      for (const [groupName, tests] of Object.entries(groups)) {
+        html += `<div class="test-group"><div class="test-group-title">${groupName}</div>`;
+        tests.forEach(t => {
+          const badge = t.passed ? '<span class="badge pass">PASS</span>' : '<span class="badge fail">FAIL</span>';
+          const detail = t.detail ? `<span class="test-detail">${t.detail}</span>` : '';
+          html += `<div class="test-row">${badge}<span class="test-name">${t.shortName}</span>${detail}</div>`;
+        });
+        html += '</div>';
+      }
+
+      document.getElementById('testResults').innerHTML = html;
+    }
+
+    // =========================================================================
+    // Run Tests
+    // =========================================================================
+    function runAllTests() {
+      // Make fixtures visible so getBoundingClientRect returns real values
+      const fixtures = document.getElementById('testFixtures');
+      fixtures.style.position = 'static';
+      fixtures.style.visibility = 'visible';
+      fixtures.style.left = '0';
+      fixtures.style.top = '0';
+
+      // --- DOM Scanner Tests ---
+      const domResult = window.PIIDomScanner.scan();
+      const sanitizedDom = domResult.sanitizedDom;
+      const boundingBoxes = domResult.boundingBoxes;
+
+      // Helper: find sanitized entry by selector or label substring
+      function findEntry(keyword) {
+        return sanitizedDom.find(e =>
+          (e.label && e.label.toLowerCase().includes(keyword.toLowerCase())) ||
+          (e.selector && e.selector.toLowerCase().includes(keyword.toLowerCase()))
+        );
+      }
+
+      // 1. Email detection
+      const emailEntry = findEntry('email');
+      assert('DOM Scanner: Email field detected', emailEntry && emailEntry.semantic_type === 'EMAIL');
+      assert('DOM Scanner: Email value replaced with placeholder', emailEntry && emailEntry.value === '[PII_EMAIL]', emailEntry ? emailEntry.value : 'not found');
+      assert('DOM Scanner: Email raw value NOT in sanitized output', emailEntry && emailEntry.value !== 'alex.rivera@example.com');
+
+      // 2. Phone detection
+      const phoneEntry = findEntry('phone');
+      assert('DOM Scanner: Phone field detected', phoneEntry && phoneEntry.semantic_type === 'PHONE');
+      assert('DOM Scanner: Phone value replaced with placeholder', phoneEntry && phoneEntry.value === '[PII_PHONE]', phoneEntry ? phoneEntry.value : 'not found');
+
+      // 3. Password detection
+      const passEntry = findEntry('password');
+      assert('DOM Scanner: Password field detected', passEntry && passEntry.semantic_type === 'PASSWORD');
+      assert('DOM Scanner: Password sensitivity is HIGH', passEntry && passEntry.sensitivity === 'HIGH');
+      assert('DOM Scanner: Password value replaced with placeholder', passEntry && passEntry.value === '[PII_PASSWORD]', passEntry ? passEntry.value : 'not found');
+      assert('DOM Scanner: Password raw value NEVER in output', passEntry && passEntry.value !== 'SuperSecretPass123!');
+
+      // 4. Credit Card detection
+      const cardEntry = findEntry('card');
+      assert('DOM Scanner: Credit Card field detected', cardEntry && cardEntry.semantic_type === 'CREDIT_CARD');
+      assert('DOM Scanner: Credit Card sensitivity is HIGH', cardEntry && cardEntry.sensitivity === 'HIGH');
+      assert('DOM Scanner: Credit Card value replaced with placeholder', cardEntry && cardEntry.value === '[PII_CREDIT_CARD]', cardEntry ? cardEntry.value : 'not found');
+      assert('DOM Scanner: Credit Card raw value NEVER in output', cardEntry && cardEntry.value !== '4532 0123 4567 8910');
+
+      // 5. Name detection
+      const nameEntry = findEntry('name');
+      assert('DOM Scanner: Name field detected', nameEntry && nameEntry.semantic_type === 'NAME');
+      assert('DOM Scanner: Name value replaced with placeholder', nameEntry && nameEntry.value === '[PII_NAME]', nameEntry ? nameEntry.value : 'not found');
+
+      // 6. Address detection
+      const addrEntry = findEntry('address');
+      assert('DOM Scanner: Address field detected', addrEntry && addrEntry.semantic_type === 'ADDRESS');
+      assert('DOM Scanner: Address value replaced with placeholder', addrEntry && addrEntry.value === '[PII_ADDRESS]', addrEntry ? addrEntry.value : 'not found');
+
+      // 7. OTP detection
+      const otpEntry = findEntry('otp');
+      assert('DOM Scanner: OTP field detected', otpEntry && otpEntry.semantic_type === 'OTP');
+      assert('DOM Scanner: OTP sensitivity is HIGH', otpEntry && otpEntry.sensitivity === 'HIGH');
+      assert('DOM Scanner: OTP value replaced with placeholder', otpEntry && otpEntry.value === '[PII_OTP]', otpEntry ? otpEntry.value : 'not found');
+
+      // 8. PIN detection
+      const pinEntry = findEntry('pin');
+      assert('DOM Scanner: PIN field detected', pinEntry && pinEntry.semantic_type === 'PIN');
+      assert('DOM Scanner: PIN sensitivity is HIGH', pinEntry && pinEntry.sensitivity === 'HIGH');
+      assert('DOM Scanner: PIN value replaced with placeholder', pinEntry && pinEntry.value === '[PII_PIN]', pinEntry ? pinEntry.value : 'not found');
+
+      // 9. API Key detection
+      const apiEntry = findEntry('api_key');
+      assert('DOM Scanner: API Key field detected', apiEntry && apiEntry.semantic_type === 'API_KEY');
+      assert('DOM Scanner: API Key sensitivity is HIGH', apiEntry && apiEntry.sensitivity === 'HIGH');
+      assert('DOM Scanner: API Key value replaced with placeholder', apiEntry && apiEntry.value === '[PII_API_KEY]', apiEntry ? apiEntry.value : 'not found');
+
+      // --- Structural Integrity Tests ---
+      assert('Structure: Labels preserved in sanitized output', sanitizedDom.some(e => e.label && e.label.length > 0));
+      assert('Structure: Bounding boxes have valid dimensions', boundingBoxes.every(b => b.width > 0 && b.height > 0));
+      assert('Structure: Each sensitive entry has a bbox', sanitizedDom.filter(e => e.sensitivity !== 'NONE').every(e => Array.isArray(e.bbox) && e.bbox.length === 4));
+      assert('Structure: Role is preserved', sanitizedDom.every(e => e.role && e.role.length > 0));
+      assert('Structure: has_value flag present', sanitizedDom.filter(e => e.sensitivity !== 'NONE').every(e => e.has_value === true));
+
+      // --- Privacy Leak Tests ---
+      const RAW_SECRETS = [
+        'alex.rivera@example.com',
+        'SuperSecretPass123!',
+        '7412',
+        '849201',
+        'sk_live_99887766554433221100',
+        '4532 0123 4567 8910'
+      ];
+
+      const serializedOutput = JSON.stringify(sanitizedDom);
+      RAW_SECRETS.forEach(secret => {
+        assert(`Privacy Leak: "${secret.substring(0, 12)}..." not in sanitized DOM`, !serializedOutput.includes(secret), secret.substring(0, 8) + '...');
+      });
+
+      // --- Sensitivity Level Tests ---
+      const highCategories = ['PASSWORD', 'PIN', 'OTP', 'API_KEY', 'TOKEN', 'PRIVATE_KEY'];
+      const modCategories = ['EMAIL', 'PHONE', 'NAME', 'ADDRESS', 'CREDIT_CARD'];
+
+      sanitizedDom.forEach(e => {
+        if (highCategories.includes(e.semantic_type)) {
+          assert(`Sensitivity: ${e.semantic_type} classified as HIGH`, e.sensitivity === 'HIGH', e.sensitivity);
+        }
+        if (modCategories.includes(e.semantic_type)) {
+          assert(`Sensitivity: ${e.semantic_type} classified as MODERATE`, e.sensitivity === 'MODERATE', e.sensitivity);
+        }
+      });
+
+      // --- Bounding Box Tests (no container-level over-redaction) ---
+      boundingBoxes.forEach(box => {
+        assert(`Bounding Box: ${box.category} box width < 600px (not container-level)`, box.width < 600, `w=${box.width}`);
+        assert(`Bounding Box: ${box.category} box height < 100px (not container-level)`, box.height < 100, `h=${box.height}`);
+      });
+
+      // Hide fixtures again
+      fixtures.style.position = 'absolute';
+      fixtures.style.visibility = 'hidden';
+      fixtures.style.left = '-9999px';
+      fixtures.style.top = '-9999px';
+
+      // --- Log Audit Test ---
+      // Verify that console.log interception would never leak raw values
+      // (We test by checking the sanitizedDom structure itself, which is what gets logged/transmitted)
+      assert('Log Audit: sanitizedDom contains no raw email', !serializedOutput.includes('alex.rivera@example.com'));
+      assert('Log Audit: sanitizedDom contains no raw password', !serializedOutput.includes('SuperSecretPass123!'));
+      assert('Log Audit: sanitizedDom contains no raw API key', !serializedOutput.includes('sk_live_99887766554433221100'));
+
+      renderResults();
+    }
+
+    // Run after DOM ready
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(runAllTests, 200);
+    });
+  </script>
+</body>
+</html>

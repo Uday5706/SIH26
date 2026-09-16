@@ -21,7 +21,7 @@ window.CVRedactor = (function () {
     // Fallback skin-tone & high contrast avatar clustering
     // In production ONNX mode, this calls WebGPU ONNX face detection model
     const skinClusters = [];
-    const step = 8; // Downsample grid step for performance
+    const step = 16; // Grid step for high performance on general sites
 
     for (let y = 0; y < height; y += step) {
       for (let x = 0; x < width; x += step) {
@@ -37,8 +37,8 @@ window.CVRedactor = (function () {
       }
     }
 
-    if (skinClusters.length > 50) {
-      // Cluster detected skin pixels into unified bounding boxes
+    if (skinClusters.length > 20) {
+      // Fast Spatial Grid Clustering (O(N) instead of O(N^2))
       const merged = clusterPoints(skinClusters, width, height);
       merged.forEach((box) => {
         boundingBoxes.push({
@@ -47,6 +47,8 @@ window.CVRedactor = (function () {
           width: box.width,
           height: box.height,
           type: 'CV_PII',
+          sensitivity: 'MODERATE',
+          category: 'AVATAR',
           reason: 'Visual Skin/Face Cluster'
         });
       });
@@ -56,7 +58,6 @@ window.CVRedactor = (function () {
   }
 
   function isSkinTone(r, g, b) {
-    // RGB rule for skin detection
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     return (
@@ -69,28 +70,44 @@ window.CVRedactor = (function () {
 
   function clusterPoints(points, maxW, maxH) {
     if (points.length === 0) return [];
-    let minX = maxW, minY = maxH, maxX = 0, maxY = 0;
+    
+    // Grid-based spatial binning (bucket size 60px)
+    const gridSize = 60;
+    const grid = new Map();
 
-    points.forEach((p) => {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
+    const maxPoints = Math.min(points.length, 1000);
+    for (let i = 0; i < maxPoints; i++) {
+      const p = points[i];
+      const gx = Math.floor(p.x / gridSize);
+      const gy = Math.floor(p.y / gridSize);
+      const key = `${gx},${gy}`;
+
+      if (!grid.has(key)) {
+        grid.set(key, { minX: p.x, maxX: p.x, minY: p.y, maxY: p.y, count: 1 });
+      } else {
+        const cell = grid.get(key);
+        cell.minX = Math.min(cell.minX, p.x);
+        cell.maxX = Math.max(cell.maxX, p.x);
+        cell.minY = Math.min(cell.minY, p.y);
+        cell.maxY = Math.max(cell.maxY, p.y);
+        cell.count++;
+      }
+    }
+
+    const boxes = [];
+    grid.forEach((cell) => {
+      if (cell.count >= 4) {
+        const pad = 10;
+        boxes.push({
+          x: Math.max(0, cell.minX - pad),
+          y: Math.max(0, cell.minY - pad),
+          width: Math.min(maxW, (cell.maxX - cell.minX) + pad * 2),
+          height: Math.min(maxH, (cell.maxY - cell.minY) + pad * 2)
+        });
+      }
     });
 
-    const width = maxX - minX;
-    const height = maxY - minY;
-
-    // Filter out huge background blocks (e.g. background walls)
-    if (width > maxW * 0.8 || height > maxH * 0.8) return [];
-    if (width < 30 || height < 30) return [];
-
-    return [{
-      x: minX,
-      y: minY,
-      width: width,
-      height: height
-    }];
+    return boxes.slice(0, 10); // Limit maximum visual avatar boxes
   }
 
   return {

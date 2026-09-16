@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Registration - Sentra Extension Test</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 40px;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 10px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    .ambiguous-text {
+      margin: 20px 0;
+      padding: 15px;
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      text-decoration: none;
+    }
+    .btn:hover {
+      background-color: #1d4ed8;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #f9fafb;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Mock Registration Form</h1>
+  <p>Use this page to test the Sentra extension's local redaction, NER detection, and DOM scanning.</p>
+
+  <!-- Test 1: Standard PII Inputs -->
+  <form id="registration-form">
+    <div class="form-group">
+      <label for="fullName">Full Name</label>
+      <input type="text" id="fullName" name="name" autocomplete="name" placeholder="John Doe" value="Tushar Kumar">
+    </div>
+
+    <div class="form-group">
+      <label for="emailAddr">Email Address</label>
+      <input type="email" id="emailAddr" name="email" autocomplete="email" placeholder="you@example.com" value="john@example.com">
+    </div>
+
+    <div class="form-group">
+      <label for="phoneNum">Phone Number</label>
+      <input type="tel" id="phoneNum" name="phone" autocomplete="tel" placeholder="+1 234 567 8900" value="+1 (555) 123-4567">
+    </div>
+
+    <div class="form-group">
+      <label for="userPwd">Password</label>
+      <input type="password" id="userPwd" name="password" autocomplete="new-password" value="secretpassword123">
+    </div>
+
+    <!-- Test 2: DOB Contextual Button -->
+    <div class="form-group">
+      <label>Date of Birth</label>
+      <button type="button" id="dob-btn" class="btn" style="background-color: #4b5563;">May 12th, 2006</button>
+    </div>
+
+    <!-- Test 3: Normal Date Control (Should remain GENERAL) -->
+    <div class="form-group">
+      <label>Meeting date</label>
+      <button type="button" id="meeting-btn" class="btn" style="background-color: #10b981;">May 12th, 2006</button>
+    </div>
+
+    <!-- Test 4: NER Entity Text (Links and Paragraphs) -->
+    <div class="ambiguous-text">
+      <strong>Customer Success Manager:</strong> 
+      <a href="#" id="manager-link">Tushar Kumar</a> (Contact me for support)
+      <br><br>
+      <em>"John Smith will be handling your onboarding process tomorrow at Google India."</em>
+    </div>
+
+    <!-- Test 5: Standard general inputs -->
+    <div class="form-group">
+      <label for="company">Company</label>
+      <input type="text" id="company" name="company" value="Products Inc.">
+    </div>
+
+    <!-- Data Table -->
+    <table>
+      <thead>
+        <tr>
+          <th>Account ID</th>
+          <th>Type</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>USR-998822</td>
+          <td>Premium</td>
+          <td>Active</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="form-group" style="margin-top: 20px;">
+      <button type="submit" class="btn">Submit Application</button>
+    </div>
+  </form>
+</div>
+
+</body>
+</html>

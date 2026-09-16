@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PRIVAGENT ML Benchmarks & Verification</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; background: #0b0f17; color: #e2e8f0; padding: 20px; }
+    h1 { color: #38bdf8; border-bottom: 1px solid #1e293b; padding-bottom: 10px; }
+    .card { background: #151d2a; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #1e293b; }
+    button { background: #0284c7; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; margin-right: 10px; font-weight: bold; }
+    button:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+    .log-window { background: #000; color: #0f0; font-family: monospace; padding: 15px; height: 300px; overflow-y: auto; border-radius: 4px; margin-top: 20px; white-space: pre-wrap; }
+    .status { display: inline-block; padding: 5px 10px; border-radius: 4px; font-size: 12px; margin-bottom: 10px; font-weight: bold; }
+    .status.passed { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .status.failed { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .status.running { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+    .row { display: flex; gap: 20px; }
+    .col { flex: 1; }
+    canvas { border: 1px solid #334155; margin-top: 10px; max-width: 100%; background: white; }
+  </style>
+</head>
+<body>
+
+  <h1>PRIVAGENT ML Benchmarks & Verification</h1>
+  <p>Run these benchmarks in a browser supporting WebGPU and Web Workers (Chrome/Edge).</p>
+
+  <div class="row">
+    <div class="col">
+      <div class="card" style="border: 1px solid #38bdf8;">
+        <h2>🛡️ Outbound Payload Verification</h2>
+        <p>Inspect the exact sanitized JSON payload handed to the network layer (Console + On-screen logs).</p>
+        <a href="outbound_verification.html" style="display:inline-block; text-decoration:none;"><button type="button" style="background:#38bdf8; color:#0b0f17;">Open Outbound Payload Inspector</button></a>
+      </div>
+
+      <div class="card">
+        <h2>4. ML Engine Benchmarks</h2>
+        <p>Benchmarks model download size, memory footprint, cold vs. warm start latency.</p>
+        <button id="btn-benchmark-ml">Run ML Benchmarks</button>
+      </div>
+      
+      <div class="card">
+        <h2>4b. Face Detection (BlazeFace)</h2>
+        <p>Tests Web Worker lazy loading, bounds only, no identity. Evaluates 1 face, multiple, and no face.</p>
+        <button id="btn-benchmark-face">Run Face Detection</button>
+      </div>
+
+      <div class="card">
+        <h2>5. Perception Cascade</h2>
+        <p>Proves models only execute when deterministic heuristics require visual inspection.</p>
+        <button id="btn-perception">Run Cascade Verification</button>
+      </div>
+
+      <div class="card">
+        <h2>6. Screenshot Privacy</h2>
+        <p>Proves image redaction completes locally before network boundary.</p>
+        <button id="btn-screenshot">Run Screenshot Redaction</button>
+      </div>
+    </div>
+    
+    <div class="col">
+      <div class="card">
+        <h2>Console Output</h2>
+        <button id="btn-clear-logs" style="background:#334155; margin-bottom:10px;">Clear</button>
+        <div class="log-window" id="logWindow">System ready. Waiting for input...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden elements for test payloads -->
+  <div id="test-sandbox" style="position: absolute; left: -9999px;">
+    <canvas id="mock-screenshot" width="400" height="200"></canvas>
+  </div>
+
+  <script src="benchmark_ml_models.js"></script>
+</body>
+</html>

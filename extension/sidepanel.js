@@ -1,10 +1,19 @@
+/**
+ * Sentra Privacy Browser Agent — Sidepanel Controller
+ * Integrated directly with the 3-Tier Local Redaction Engine and FastAPI VLM Server.
+ */
+
 const thread = document.getElementById("thread");
 const input = document.getElementById("composerInput");
 const sendBtn = document.getElementById("sendBtn");
 const captureBtn = document.getElementById("captureBtn");
-const closeBtn = document.getElementById("closeBtn");
+const profileBtn = document.getElementById("profileBtn");
 const newTaskBtn = document.getElementById("newTaskBtn");
 const sessionLabel = document.getElementById("sessionLabel");
+
+
+const agentFlow = document.getElementById("agentFlow");
+const welcomeBox = document.getElementById("welcomeBox");
 
 const flowSubtitle = document.getElementById("flowSubtitle");
 const statusPill = document.getElementById("statusPill");
@@ -32,7 +41,84 @@ let timerId = null;
 let taskStartedAt = null;
 let activeTask = false;
 let pendingConfirmation = null;
-let abortController = null;
+let currentServerUrl = "http://127.0.0.1:8000";
+const urlParams = new URLSearchParams(window.location.search);
+const queryTabId = urlParams.get("tabId") ? parseInt(urlParams.get("tabId"), 10) : null;
+let boundTabId = queryTabId;
+
+function updateHeaderForTab(tab) {
+  if (!tab) return;
+  if (tab.url && !tab.url.startsWith("chrome") && !tab.url.startsWith("edge") && !tab.url.startsWith("about")) {
+    try {
+      const urlObj = new URL(tab.url);
+      sessionLabel.textContent = urlObj.hostname || tab.title || "Active Tab";
+    } catch {
+      sessionLabel.textContent = tab.title || "Active Tab";
+    }
+  } else {
+    sessionLabel.textContent = tab.title || "Active Tab";
+  }
+}
+
+async function getValidTargetTab() {
+  // 1. ALWAYS query the currently active tab first to prevent getting stuck on old tabs
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const normalTab = tabs.find(t => t && t.url && !t.url.startsWith("chrome-extension://") && !t.url.startsWith("chrome://"));
+    if (normalTab) {
+      boundTabId = normalTab.id; // forcefully update boundTabId
+      return normalTab;
+    }
+  } catch (e) {}
+
+  // 2. If bound to a query tabId, check if it's still alive
+  if (boundTabId) {
+    try {
+      const tab = await chrome.tabs.get(boundTabId);
+      if (tab && tab.url && !tab.url.startsWith("chrome-extension://") && !tab.url.startsWith("chrome://")) {
+        return tab;
+      }
+    } catch (e) {
+      boundTabId = null;
+    }
+  }
+
+  // 3. Fallback: Query all active tabs across windows
+  try {
+    const allTabs = await chrome.tabs.query({ active: true });
+    const normalTab = allTabs.find(t => t.url && !t.url.startsWith("chrome-extension://") && !t.url.startsWith("chrome://"));
+    if (normalTab) return normalTab;
+  } catch (e) {}
+
+  return null;
+}
+
+async function initBoundTab() {
+  const tab = await getValidTargetTab();
+  if (tab && tab.id) {
+    boundTabId = tab.id;
+    updateHeaderForTab(tab);
+  }
+}
+initBoundTab();
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    // Ignore viewer.html or internal extension tabs so we don't accidentally switch focus to the audit viewer
+    if (tab && tab.url && !tab.url.startsWith("chrome-extension://") && !tab.url.startsWith("chrome://")) {
+      boundTabId = tab.id;
+      updateHeaderForTab(tab);
+    }
+  } catch {}
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (tab && tab.active && tab.url && !tab.url.startsWith("chrome-extension://") && !tab.url.startsWith("chrome://")) {
+    boundTabId = tab.id;
+    updateHeaderForTab(tab);
+  }
+});
 
 /* -------------------------------------------------------------------------- */
 /* Sequential stage controller                                                */
@@ -49,6 +135,7 @@ const stages = [
 
 function showStage(stageElement) {
   if (!stageElement) return;
+  ensureFlowVisible();
   stageElement.classList.remove("hidden");
   stageElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -58,17 +145,32 @@ function hideStage(stageElement) {
   stageElement.classList.add("hidden");
 }
 
-/*
-  Reset means only Stage 1 is visible.
-  Every following stage is revealed by the agent as it reaches that step.
-*/
+function ensureFlowVisible() {
+  if (agentFlow) {
+    agentFlow.classList.remove("hidden");
+    agentFlow.hidden = false;
+    agentFlow.style.display = "block";
+  }
+  if (welcomeBox) {
+    welcomeBox.style.display = "none";
+  }
+}
+
 function resetStages() {
   for (const stage of stages) hideStage(stage);
 
-  showStage(stageTask);
+  if (agentFlow) {
+    agentFlow.classList.add("hidden");
+    agentFlow.hidden = true;
+    agentFlow.style.display = "none";
+  }
+
+  if (welcomeBox) {
+    welcomeBox.style.display = "flex";
+  }
 
   taskValue.textContent = "Waiting for task…";
-  statusValue.textContent = "Starting…";
+  statusValue.textContent = "Ready";
   stepValue.textContent = "—";
   elapsedValue.textContent = "00:00.00";
   actionValue.textContent = "—";
@@ -79,6 +181,12 @@ function resetStages() {
   setProgress(0);
 
   stageConfirmation.classList.add("hidden");
+  
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
+  }
 }
 
 function revealStatus(statusText) {
@@ -118,16 +226,31 @@ function setProgress(value) {
   progressBar.style.width = `${safe}%`;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Controls                                                                    */
-/* -------------------------------------------------------------------------- */
+if (profileBtn) {
+  profileBtn.addEventListener("click", () => {
+    // Future: handle profile/account menu
+  });
+}
 
-closeBtn.addEventListener("click", () => window.close());
+
+
+// Bind suggestion chips
+document.querySelectorAll(".suggestion-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const prompt = chip.getAttribute("data-prompt") || chip.textContent.trim();
+    handleSend(prompt);
+  });
+});
 
 newTaskBtn.addEventListener("click", () => {
   resetAgent();
   thread.innerHTML = "";
+  if (welcomeBox) {
+    thread.appendChild(welcomeBox);
+    welcomeBox.style.display = "flex";
+  }
   sessionLabel.textContent = "Privacy Browser Agent";
+  initBoundTab();
   input.focus();
 });
 
@@ -144,7 +267,11 @@ input.addEventListener("keydown", (e) => {
 });
 
 sendBtn.addEventListener("click", handleSend);
-captureBtn.addEventListener("click", () => runCaptureCycle());
+if (captureBtn) {
+  captureBtn.addEventListener("click", () => {
+    handleSend("Scan page and fill form securely");
+  });
+}
 
 confirmBtn.addEventListener("click", () => {
   if (!pendingConfirmation) return;
@@ -163,30 +290,36 @@ confirmBtn.addEventListener("click", () => {
     action
   }).catch(() => {});
 
-  addAgentText("Confirmation received — continuing.");
+  addAgentText("Confirmation received — executing action.");
 });
 
 denyBtn.addEventListener("click", () => {
   pendingConfirmation = null;
   hideStage(stageConfirmation);
-  stopCurrentTask("Cancelled by user");
+  stopCurrentTask("Action cancelled by user");
 });
 
+stopBtn.addEventListener("click", () => stopCurrentTask("Stopped by user"));
+
 /* -------------------------------------------------------------------------- */
-/* Backend -> frontend contract                                               */
+/* Backend -> Sidepanel Message Router                                        */
 /* -------------------------------------------------------------------------- */
 
 chrome.runtime.onMessage.addListener((message) => {
   if (!message) return;
 
   if (message.type === "AGENT_STATUS") {
-    /*
-      Backend can send these one at a time.
-      We intentionally reveal the next UI stage only when its data arrives.
-    */
-    revealStatus(message.label || message.status || "Agent is working…");
+    ensureFlowVisible();
+    revealStatus(message.label || "Agent is working…");
+    revealElapsed();
+    
+    if (message.step) revealStep(message.step);
+    if (message.action) revealAction(message.action);
+    if (message.progress != null) setProgress(message.progress);
+
+    const stateKey = message.status || "running";
     setAgentState(
-      message.status || "running",
+      stateKey,
       message.label || "Agent is working…",
       ({
         running: "RUNNING",
@@ -194,25 +327,31 @@ chrome.runtime.onMessage.addListener((message) => {
         waiting: "WAITING",
         success: "DONE",
         error: "ERROR"
-      })[message.status] || "RUNNING"
+      })[stateKey] || "RUNNING"
     );
 
-    if (message.progress != null) setProgress(message.progress);
+    if (message.confirmation) {
+      revealConfirmation(message.confirmation);
+    }
+    return;
+  }
 
-    if (message.step) revealStep(message.step);
-    if (message.showElapsed !== false) revealElapsed();
-    if (message.action) revealAction(message.action);
-    if (message.confirmation) revealConfirmation(message.confirmation);
+  if (message.type === "AGENT_TRACE") {
+    if (message.steps) {
+      addTraceCard(message.steps, formatDuration(taskStartedAt));
+    }
     return;
   }
 
   if (message.type === "AGENT_STEP") {
+    ensureFlowVisible();
     revealStep(message.step || "Processing…");
     if (message.progress != null) setProgress(message.progress);
     return;
   }
 
   if (message.type === "AGENT_ACTION") {
+    ensureFlowVisible();
     revealAction(message.action || "Executing browser action…");
     setAgentState("running", "Action in progress", "RUNNING");
     if (message.progress != null) setProgress(message.progress);
@@ -220,6 +359,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "AGENT_CONFIRM") {
+    ensureFlowVisible();
     revealConfirmation(message.message);
     pendingConfirmation = message.action;
     setAgentState("waiting", "Waiting for your confirmation", "WAITING");
@@ -228,7 +368,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message.type === "AGENT_DONE") {
-    finishTask(message.message || "Task completed successfully.");
+    finishTask(message.message || "Task completed successfully on the page.");
     return;
   }
 
@@ -236,169 +376,97 @@ chrome.runtime.onMessage.addListener((message) => {
     failTask(message.message || "The agent could not complete this task.");
     return;
   }
+
+  if (message.type === "DRY_RUN_PAYLOAD") {
+    ensureFlowVisible();
+    const stageDryRun = document.getElementById("stageDryRun");
+    const dryRunPayloadElem = document.getElementById("dryRunPayload");
+    if (stageDryRun && dryRunPayloadElem) {
+      showStage(stageDryRun);
+      dryRunPayloadElem.textContent = JSON.stringify(message.payload, null, 2);
+    }
+    return;
+  }
 });
 
 /* -------------------------------------------------------------------------- */
-/* Task lifecycle                                                             */
+/* Task Lifecycle                                                             */
 /* -------------------------------------------------------------------------- */
 
-function handleSend() {
-  const text = input.value.trim();
+function handleSend(customText) {
+  const text = (customText || input.value).trim();
   if (!text) return;
 
   addUserMessage(text);
   input.value = "";
   input.style.height = "auto";
 
-  runCaptureCycle(text);
+  runAgentTask(text);
 }
 
 function startTask(taskText) {
   activeTask = true;
   taskStartedAt = performance.now();
   pendingConfirmation = null;
-  abortController = new AbortController();
 
   resetStages();
+  ensureFlowVisible();
+  showStage(stageTask);
 
-  // Stage 1: task appears first.
-  taskValue.textContent = taskText || "Scan current page";
+  // Stage 1: Task text
+  taskValue.textContent = taskText || "Execute privacy-preserving workflow";
   sessionLabel.textContent = "Current task";
 
-  setAgentState("running", "Task received", "RUNNING");
-  stopBtn.hidden = false;
-
-  // Small delay makes the sequential UI visible even with a fast backend.
-  setProgress(8);
+  setAgentState("running", "Task initiated", "RUNNING");
+  if (stopBtn) {
+    stopBtn.hidden = false;
+    stopBtn.classList.remove("hidden");
+    stopBtn.style.display = "flex";
+  }
+  setProgress(10);
 }
 
-async function runCaptureCycle(taskText) {
+async function runAgentTask(taskText) {
   if (activeTask) {
-    addAgentText("A task is already running. Stop it before starting another.");
+    addAgentText("A task is already running. Click STOP before starting a new task.");
+    return;
+  }
+
+  const validTab = await getValidTargetTab();
+  if (validTab && validTab.id) {
+    boundTabId = validTab.id;
+    updateHeaderForTab(validTab);
+  } else if (!boundTabId) {
+    addAgentText("Please switch to a webpage tab to run the privacy agent.");
     return;
   }
 
   startTask(taskText);
 
-  try {
-    /*
-      Stage 2: Agent status
-    */
-    await delay(1000);
-    if (!activeTask) return;
-
-    revealStatus("Observing page locally…");
-    setProgress(20);
-
-    /*
-      Stage 3: Current step
-    */
-    await delay(1100);
-    if (!activeTask) return;
-
-    revealStep("Scanning the current page");
-    setProgress(34);
-
-    /*
-      Stage 4: Elapsed time
-      Timer starts only when this stage appears.
-    */
-    await delay(1100);
-    if (!activeTask) return;
-
-    revealElapsed();
-    setProgress(42);
-
-    const scan = await runLocalScan();
-    if (!activeTask) return;
-
-    /*
-      Privacy processing remains visible as a status/step transition.
-    */
-    setAgentState("privacy", "Privacy scan passed", "PRIVACY");
-    revealStep("Sanitizing sensitive visual context locally…");
-    setProgress(55);
-
-    const steps = [
-      {
-        kind: "scan",
-        title: `Observed ${scan.elements} UI elements, ${scan.faces} face(s), ${scan.textFields} text field(s)`,
-        detail: scan.scanDetail || "Local visual/DOM analysis"
-      },
-      {
-        kind: "redact",
-        title: "Sensitive data protected before network transmission",
-        tags: (scan.redactions || []).map((r) => ({ label: r, type: "pii" }))
-      },
-      {
-        kind: "scan",
-        title: "Sanitized context ready for server reasoning",
-        detail: "Only safe structure, positions, and placeholder tags are exposed to the reasoning service.",
-        tags: [{ label: "payload: sanitized", type: "safe" }]
-      }
-    ];
-
-    addTraceCard(steps, formatDuration(taskStartedAt));
-
-    /*
-      Stage 2 + 3 update as the agent progresses.
-    */
-    setAgentState("running", "Server reasoning", "RUNNING");
-    revealStep("Interpreting sanitized context…");
-    setProgress(66);
-
-    const serverResult = await callServer(scan.sanitizedPayload, taskText);
-    if (!activeTask) return;
-
-    if (serverResult?.needsConfirmation) {
-      /*
-        Stage 6 appears ONLY when confirmation is actually needed.
-      */
-      revealAction(serverResult.action || "Action requires approval");
-      revealConfirmation(serverResult.message);
-      pendingConfirmation = serverResult.actionPayload;
-
-      setAgentState("waiting", "Waiting for your confirmation", "WAITING");
-      setProgress(78);
-      return;
+  // Send start command to Background Service Worker restricted to current tab
+  chrome.runtime.sendMessage({
+    action: "START_AGENT",
+    payload: {
+      goal: taskText,
+      serverUrl: currentServerUrl,
+      tabId: boundTabId
     }
-
-    /*
-      Stage 5: Action being performed
-    */
-    revealAction(serverResult?.action || "Executing browser action…");
-    revealStep(serverResult?.step || "Performing browser action…");
-    setAgentState("running", "Executing action", "RUNNING");
-    setProgress(88);
-
-    if (serverResult?.actionPayload) {
-      chrome.runtime.sendMessage({
-        target: "content",
-        type: "RUN_ACTION",
-        action: serverResult.actionPayload
-      }).catch(() => {});
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn("Could not reach background service worker directly:", chrome.runtime.lastError.message);
     }
-
-    finishTask(
-      serverResult?.followUp ||
-      scan.followUp ||
-      "Task completed successfully."
-    );
-  } catch (error) {
-    if (error?.name === "AbortError") return;
-    failTask(error?.message || "Something went wrong while running the task.");
-  }
+  });
 }
-
-/* -------------------------------------------------------------------------- */
-/* Completion / cancellation                                                  */
-/* -------------------------------------------------------------------------- */
 
 function finishTask(message) {
   stopTimer();
   activeTask = false;
   pendingConfirmation = null;
-  stopBtn.hidden = true;
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
+  }
 
   setAgentState("success", "Task completed", "DONE");
   revealAction("Completed");
@@ -412,7 +480,11 @@ function failTask(message) {
   stopTimer();
   activeTask = false;
   pendingConfirmation = null;
-  stopBtn.hidden = true;
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
+  }
 
   setAgentState("error", "Agent stopped with an error", "ERROR");
   revealStep("Needs attention");
@@ -428,11 +500,10 @@ function stopCurrentTask(reason = "Stopped by user") {
   stopTimer();
   activeTask = false;
   pendingConfirmation = null;
-  stopBtn.hidden = true;
-
-  if (abortController) {
-    abortController.abort();
-    abortController = null;
+  if (stopBtn) {
+    stopBtn.hidden = true;
+    stopBtn.classList.add("hidden");
+    stopBtn.style.display = "none";
   }
 
   setAgentState("waiting", reason, "STOPPED");
@@ -443,23 +514,15 @@ function stopCurrentTask(reason = "Stopped by user") {
   addAgentText("Task stopped. No further browser actions will be executed.");
 
   chrome.runtime.sendMessage({
-    target: "content",
-    type: "STOP_AGENT"
+    action: "STOP_AGENT"
   }).catch(() => {});
-
-  if (typeof window.SentraAgent?.onStopRequested === "function") {
-    window.SentraAgent.onStopRequested();
-  }
 }
-
-stopBtn.addEventListener("click", () => stopCurrentTask());
 
 function resetAgent() {
   stopTimer();
   activeTask = false;
   taskStartedAt = null;
   pendingConfirmation = null;
-  abortController = null;
   stopBtn.hidden = true;
   resetStages();
 }
@@ -497,7 +560,7 @@ function updateElapsed() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Existing trace / chat UI                                                   */
+/* Chat Thread & Trace Card Rendering                                        */
 /* -------------------------------------------------------------------------- */
 
 function addUserMessage(text) {
@@ -532,7 +595,7 @@ function addTraceCard(steps, durationLabel) {
   wrap.className = "msg msg-agent";
 
   const trace = document.createElement("div");
-  trace.className = "trace";
+  trace.className = "trace open";
 
   const head = document.createElement("div");
   head.className = "trace-head";
@@ -541,7 +604,7 @@ function addTraceCard(steps, durationLabel) {
       <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    <span>Agent trace • ${durationLabel}</span>
+    <span>🔒 Privacy Trace • ${durationLabel}</span>
   `;
   head.addEventListener("click", () => trace.classList.toggle("open"));
 
@@ -612,68 +675,6 @@ function scrollToBottom() {
   thread.scrollTop = thread.scrollHeight;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Frontend seams for backend/local model integration                         */
-/* -------------------------------------------------------------------------- */
-
-async function callServer(sanitizedPayload, taskText) {
-  /*
-    Replace ONLY this function with your backend API call.
-
-    Backend response:
-    {
-      action: "Executing click…",
-      step: "Executing click",
-      actionPayload: { ... },
-      needsConfirmation: false,
-      message: "...",
-      followUp: "Done — ..."
-    }
-  */
-  await delay(1600);
-
-  return {
-    action: "Executing click…",
-    step: "Executing click",
-    actionPayload: {
-      type: "toast",
-      message: "Sentra: sanitized context processed."
-    },
-    needsConfirmation: false,
-    followUp: "Done — the sanitized page context was processed and the action was applied."
-  };
-}
-
-async function runLocalScan() {
-  /*
-    Replace with the real local DOM / vision / redaction pipeline.
-    Never put raw PII or unredacted pixels in sanitizedPayload.
-  */
-  await delay(1200);
-
-  return {
-    elements: 14,
-    faces: 1,
-    textFields: 3,
-    redactions: [
-      "face → blurred",
-      "email → [EMAIL]",
-      "password → blacked out"
-    ],
-    sanitizedPayload: {
-      elements: 14,
-      safeRoles: ["input", "button", "heading"],
-      redactions: ["FACE", "EMAIL", "PASSWORD"]
-    },
-    scanDetail: "Local page scan • privacy filter active",
-    followUp: "Done — the sanitized context was processed and the action was applied."
-  };
-}
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 function formatDuration(start) {
   if (typeof start !== "number") return "00:00.00";
 
@@ -688,18 +689,5 @@ function formatDuration(start) {
          `${String(hundredths).padStart(2, "0")}`;
 }
 
-/* Optional integration namespace for the backend developer. */
-window.SentraAgent = {
-  revealStatus,
-  revealStep,
-  revealElapsed,
-  revealAction,
-  revealConfirmation,
-  setAgentState,
-  setProgress,
-  finishTask,
-  failTask,
-  onStopRequested: null
-};
-
 resetAgent();
+

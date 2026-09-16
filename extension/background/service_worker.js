@@ -4,46 +4,35 @@
  * backend API transmission, and macro execution loops.
  */
 
+import { AgentController } from './agent_controller.js';
+import { PrivacyGate } from './privacy_gate.js';
+
 let agentState = {
-  isRunning: false,
+  logs: [],
   status: 'Idle',
-  userGoal: '',
-  serverUrl: 'http://127.0.0.1:8000',
-  domRedactionEnabled: true,
-  textRedactionEnabled: true,
-  cvRedactionEnabled: true,
-  redactionBufferPx: 5,
-  logs: []
+  isRunning: false
 };
 
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen/offscreen.html';
 
-// Offscreen Document Lifecycle Management
 async function setupOffscreenDocument() {
-  if (await hasOffscreenDocument()) return;
-
+  if (await chrome.offscreen.hasDocument()) return;
   try {
     await chrome.offscreen.createDocument({
-      url: OFFSCREEN_DOCUMENT_PATH,
-      reasons: [chrome.offscreen.Reason.DOM_PARSER || 'DOM_PARSER', chrome.offscreen.Reason.BLOBS || 'BLOBS'],
-      justification: 'Offscreen canvas processing for PII visual redaction and WebP encoding.'
+      url: chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH),
+      reasons: ['DOM_PARSER', 'BLOBS'],
+      justification: 'Offscreen canvas processing'
     });
+    await new Promise((r) => setTimeout(r, 100));
   } catch (err) {
-    if (!err.message.includes('Only a single offscreen document')) {
-      throw err;
+    if (!err.message?.includes('Only a single offscreen document')) {
+      console.warn('Offscreen creation error:', err);
     }
   }
 }
 
-async function hasOffscreenDocument() {
-  const matchedClients = await clients.matchAll();
-  for (const client of matchedClients) {
-    if (client.url.endsWith(OFFSCREEN_DOCUMENT_PATH)) {
-      return true;
-    }
-  }
-  return false;
-}
+// Pre-warm offscreen document on startup
+setupOffscreenDocument().catch(() => {});
 
 function addLog(msg) {
   const timestamp = new Date().toLocaleTimeString();
@@ -51,7 +40,6 @@ function addLog(msg) {
   agentState.logs.unshift(entry);
   if (agentState.logs.length > 50) agentState.logs.pop();
 
-  // Notify active popups
   chrome.runtime.sendMessage({
     action: 'LOG_EVENT',
     payload: { entry, logs: agentState.logs }
@@ -60,6 +48,12 @@ function addLog(msg) {
 
 function updateStatus(newStatus) {
   agentState.status = newStatus;
+  
+  // Keep isRunning synced so background events like DOM_MUTATION know if agent is active
+  if (newStatus.toLowerCase().includes('error') || newStatus.toLowerCase().includes('failed') || newStatus.toLowerCase().includes('complete') || newStatus.toLowerCase().includes('cancelled')) {
+    agentState.isRunning = false;
+  }
+  
   addLog(`Status: ${newStatus}`);
   chrome.runtime.sendMessage({
     action: 'STATUS_UPDATE',
@@ -75,9 +69,20 @@ async function ensureContentScriptInjected(tabId) {
       await chrome.scripting.executeScript({
         target: { tabId: tabId },
         files: [
+          'privacy/token-vault.js',
+          'privacy/policy.js',
+          'privacy/fusion.js',
+          'content/dom-observer.js',
+          'content/page-extractor.js',
           'content/pii_dom_scanner.js',
           'content/pii_text_scanner.js',
-          'content/macro_executor.js',
+          'agent/action-guard.js',
+          'content/actions/executor.js',
+          'content/actions/click.js',
+          'content/actions/type.js',
+          'content/actions/scroll.js',
+          'content/actions/keypress.js',
+          'content/actions/wait.js',
           'content/content_script.js'
         ]
       });
@@ -88,142 +93,101 @@ async function ensureContentScriptInjected(tabId) {
   }
 }
 
-// Core Execution Cycle
-async function runAgentCycle(tabId) {
-  if (!agentState.isRunning) return;
+// Instantiate the controller
+const agentController = new AgentController(addLog, updateStatus, setupOffscreenDocument, ensureContentScriptInjected);
 
-  try {
-    updateStatus('Scanning DOM & Text PII...');
-    await setupOffscreenDocument();
-    await ensureContentScriptInjected(tabId);
+// Ensure global sidepanel doesn't open automatically and is disabled globally by default
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
 
-    // Step 1: Scan Tier 1 & 2 PII bounding boxes from active content script
-    const contentResponse = await chrome.tabs.sendMessage(tabId, { action: 'SCAN_PII' });
-    const boundingBoxes = (contentResponse && contentResponse.boundingBoxes) || [];
-    addLog(`Scanned ${boundingBoxes.length} PII target bounding boxes.`);
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+  chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
+});
 
-    // Step 2: Capture screen state
-    updateStatus('Capturing screen state...');
-    const rawDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-
-    // Step 3: Offscreen Canvas Obfuscation (+5px padding & Tier 3 CV)
-    updateStatus('Redacting sensitive visual regions...');
-    const redactionResult = await chrome.runtime.sendMessage({
-      action: 'REDACT_CANVAS',
-      payload: {
-        dataUrl: rawDataUrl,
-        boundingBoxes: boundingBoxes,
-        paddingPx: agentState.redactionBufferPx,
-        cvEnabled: agentState.cvRedactionEnabled
-      }
-    });
-
-    if (!redactionResult || !redactionResult.success) {
-      throw new Error(redactionResult?.error || 'Canvas redaction failed.');
-    }
-
-    const { redactedImageWebp, redactedCount } = redactionResult.result;
-    addLog(`Obfuscation complete. ${redactedCount} regions blacked out (+${agentState.redactionBufferPx}px buffer).`);
-
-    // Step 4: Transmit anonymized payload to backend FastAPI server
-    updateStatus('Sending anonymized state to VLM server...');
-    const response = await fetch(`${agentState.serverUrl}/api/v1/plan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        goal: agentState.userGoal,
-        image: redactedImageWebp,
-        tab_info: { id: tabId }
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Server returned status ${response.status}`);
-    }
-
-    const planData = await response.json();
-    const steps = planData.steps || [];
-    addLog(`VLM returned plan with ${steps.length} steps.`);
-
-    if (steps.length === 0 || planData.status === 'completed') {
-      agentState.isRunning = false;
-      updateStatus('Goal Completed Successfully!');
-      return;
-    }
-
-    // Step 5: Execute Macro Plan on tab
-    updateStatus('Executing macro step plan...');
-    await chrome.tabs.sendMessage(tabId, {
-      action: 'EXECUTE_STEPS',
-      payload: { steps: steps }
-    });
-
-  } catch (err) {
-    console.error('Agent cycle error:', err);
-    agentState.isRunning = false;
-    updateStatus(`Error: ${err.message}`);
-  }
-}
+chrome.action.onClicked.addListener((tab) => {
+  if (!tab || !tab.id) return;
+  
+  // Enable the side panel specifically for the active tab with tabId query parameter
+  chrome.sidePanel.setOptions({
+    tabId: tab.id,
+    path: `sidepanel.html?tabId=${tab.id}`,
+    enabled: true
+  });
+  
+  // Open it for this tab (must be called synchronously to keep user gesture)
+  chrome.sidePanel.open({ windowId: tab.windowId, tabId: tab.id }).catch((err) => {
+    console.warn('Error opening tab-specific side panel:', err);
+  });
+});
 
 // Runtime Listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message) return;
+
+  // Relay from sidepanel to content script if explicitly targeted
+  if (message.target === "content" && sender.tab === undefined) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0]?.id;
+      if (tabId != null) {
+        chrome.tabs.sendMessage(tabId, message).catch(() => {});
+      }
+    });
+    return false;
+  }
+
   const { action, payload } = message;
 
   if (action === 'START_AGENT') {
     agentState.isRunning = true;
-    agentState.userGoal = payload.goal || 'Complete task';
-    agentState.serverUrl = payload.serverUrl || agentState.serverUrl;
-    updateStatus('Starting Agent Loop...');
+    const goal = (payload && payload.goal) || 'Complete task';
+    const serverUrl = (payload && payload.serverUrl) || 'http://127.0.0.1:8000';
+    const targetTabId = payload && payload.tabId;
+    
+    if (targetTabId) {
+      agentController.start(goal, targetTabId, serverUrl);
+    } else {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs.length > 0) {
+          agentController.start(goal, tabs[0].id, serverUrl);
+        } else {
+          updateStatus('Error: No active tab found.');
+        }
+      });
+    }
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length > 0) {
-        runAgentCycle(tabs[0].id);
-      } else {
-        agentState.isRunning = false;
-        updateStatus('Error: No active tab found.');
-      }
-    });
-
-    sendResponse({ success: true, state: agentState });
+    sendResponse({ success: true, state: agentController.state });
     return true;
   }
 
   if (action === 'STOP_AGENT') {
-    agentState.isRunning = false;
-    updateStatus('Agent Stopped by User.');
-    
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length > 0) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'STOP_EXECUTION' }).catch(() => {});
-      }
-    });
-
-    sendResponse({ success: true, state: agentState });
+    agentController.stop();
+    sendResponse({ success: true, state: agentController.state });
     return true;
   }
 
   if (action === 'GET_AGENT_STATUS') {
-    sendResponse({ success: true, state: agentState });
+    sendResponse({ success: true, state: agentController.state });
     return true;
   }
 
   if (action === 'EXECUTION_FINISHED') {
-    if (payload && payload.finished) {
-      agentState.isRunning = false;
-      updateStatus('Task execution finished!');
-    } else if (agentState.isRunning) {
-      // Re-trigger cycle for dynamic page updates
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs.length > 0) {
-          runAgentCycle(tabs[0].id);
-        }
-      });
-    }
+    agentController.handleExecutionFinished(payload);
   }
 
   if (action === 'LOG_EVENT') {
     if (payload && payload.message) {
       addLog(payload.message);
     }
+    return true;
+  }
+
+  if (action === 'DOM_MUTATION') {
+    // Handle DOM mutations reported by dom-observer.js
+    if (agentState.isRunning) {
+      console.log('[ServiceWorker] Received DOM mutation:', payload);
+      // We could trigger a new reasoning cycle here if needed
+    }
+    return true;
   }
 });
